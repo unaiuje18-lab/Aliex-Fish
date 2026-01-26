@@ -1,51 +1,55 @@
 import { Star, CheckCircle } from "lucide-react";
 
-interface Review {
+interface ReviewFromDB {
   id: string;
   name: string;
   rating: number;
   comment: string;
-  date?: string;
-  verified?: boolean;
-  avatar?: string;
+  date_label: string;
+  is_verified: boolean;
+  avatar_url: string | null;
 }
 
 interface ReviewsSectionProps {
-  reviews?: Review[];
+  reviews?: ReviewFromDB[];
 }
 
-const defaultReviews: Review[] = [
+const defaultReviews: ReviewFromDB[] = [
   {
     id: "1",
     name: "María García",
     rating: 5,
     comment: "¡Increíble calidad! Superó todas mis expectativas. El envío fue rapidísimo y el producto es exactamente como se muestra en las fotos. 100% recomendado.",
-    date: "Hace 2 días",
-    verified: true,
+    date_label: "Hace 2 días",
+    is_verified: true,
+    avatar_url: null,
   },
   {
     id: "2",
     name: "Carlos Rodríguez",
     rating: 5,
     comment: "Excelente relación calidad-precio. Ya es mi tercera compra y siempre quedo satisfecho. El servicio al cliente es muy bueno.",
-    date: "Hace 5 días",
-    verified: true,
+    date_label: "Hace 5 días",
+    is_verified: true,
+    avatar_url: null,
   },
   {
     id: "3",
     name: "Ana Martínez",
     rating: 4,
     comment: "Muy buen producto, llegó bien empaquetado y en perfectas condiciones. Lo uso todos los días y funciona perfecto.",
-    date: "Hace 1 semana",
-    verified: true,
+    date_label: "Hace 1 semana",
+    is_verified: true,
+    avatar_url: null,
   },
   {
     id: "4",
     name: "Pedro López",
     rating: 5,
     comment: "Fantástico. Compré uno para mí y otro de regalo. A todos les encantó. Sin duda volveré a comprar.",
-    date: "Hace 2 semanas",
-    verified: true,
+    date_label: "Hace 2 semanas",
+    is_verified: true,
+    avatar_url: null,
   },
 ];
 
@@ -89,9 +93,9 @@ export const ReviewsSection = ({ reviews = defaultReviews }: ReviewsSectionProps
             >
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground font-bold text-lg shrink-0">
-                  {review.avatar ? (
+                  {review.avatar_url ? (
                     <img
-                      src={review.avatar}
+                      src={review.avatar_url}
                       alt={review.name}
                       className="w-full h-full rounded-full object-cover"
                     />
@@ -104,7 +108,7 @@ export const ReviewsSection = ({ reviews = defaultReviews }: ReviewsSectionProps
                     <span className="font-semibold text-foreground">
                       {review.name}
                     </span>
-                    {review.verified && (
+                    {review.is_verified && (
                       <span className="flex items-center gap-1 text-xs text-success font-medium">
                         <CheckCircle className="w-3 h-3" />
                         Verificado
@@ -124,9 +128,9 @@ export const ReviewsSection = ({ reviews = defaultReviews }: ReviewsSectionProps
                         />
                       ))}
                     </div>
-                    {review.date && (
+                    {review.date_label && (
                       <span className="text-xs text-muted-foreground">
-                        {review.date}
+                        {review.date_label}
                       </span>
                     )}
                   </div>

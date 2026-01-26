@@ -1,34 +1,34 @@
 import { Play } from "lucide-react";
 import { useState } from "react";
 
-interface Video {
+interface VideoFromDB {
   id: string;
-  thumbnail: string;
-  videoUrl: string;
-  title?: string;
+  thumbnail_url: string | null;
+  video_url: string;
+  title: string | null;
 }
 
 interface VideoGalleryProps {
-  videos?: Video[];
+  videos?: VideoFromDB[];
 }
 
-const defaultVideos: Video[] = [
+const defaultVideos: VideoFromDB[] = [
   {
     id: "1",
-    thumbnail: "https://images.unsplash.com/photo-1611532736597-de2d4265fba3?w=400&h=600&fit=crop",
-    videoUrl: "",
+    thumbnail_url: "https://images.unsplash.com/photo-1611532736597-de2d4265fba3?w=400&h=600&fit=crop",
+    video_url: "",
     title: "Unboxing del producto",
   },
   {
     id: "2",
-    thumbnail: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=600&fit=crop",
-    videoUrl: "",
+    thumbnail_url: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=600&fit=crop",
+    video_url: "",
     title: "Review completa",
   },
   {
     id: "3",
-    thumbnail: "https://images.unsplash.com/photo-1572569511254-d8f925fe2cbb?w=400&h=600&fit=crop",
-    videoUrl: "",
+    thumbnail_url: "https://images.unsplash.com/photo-1572569511254-d8f925fe2cbb?w=400&h=600&fit=crop",
+    video_url: "",
     title: "Demostración en uso",
   },
 ];
@@ -37,6 +37,8 @@ export const VideoGallery = ({ videos = defaultVideos }: VideoGalleryProps) => {
   const [activeVideo, setActiveVideo] = useState<string | null>(null);
 
   if (videos.length === 0) return null;
+
+  const activeVideoData = videos.find(v => v.id === activeVideo);
 
   return (
     <section className="py-16 lg:py-24 bg-background">
@@ -58,7 +60,7 @@ export const VideoGallery = ({ videos = defaultVideos }: VideoGalleryProps) => {
               onClick={() => setActiveVideo(video.id)}
             >
               <img
-                src={video.thumbnail}
+                src={video.thumbnail_url || 'https://images.unsplash.com/photo-1611532736597-de2d4265fba3?w=400&h=600&fit=crop'}
                 alt={video.title || "Video del producto"}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               />
@@ -93,9 +95,18 @@ export const VideoGallery = ({ videos = defaultVideos }: VideoGalleryProps) => {
           onClick={() => setActiveVideo(null)}
         >
           <div className="relative w-full max-w-lg aspect-[9/16] rounded-2xl overflow-hidden bg-card">
-            <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
-              Video en modo demo
-            </div>
+            {activeVideoData?.video_url ? (
+              <iframe
+                src={activeVideoData.video_url}
+                className="absolute inset-0 w-full h-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
+                Video en modo demo
+              </div>
+            )}
           </div>
         </div>
       )}
