@@ -1,42 +1,65 @@
-import { LucideIcon, Zap, Shield, Sparkles, Clock, Heart } from "lucide-react";
+import * as LucideIcons from "lucide-react";
+import { LucideIcon, Zap, Shield, Sparkles, Clock, Heart, Check } from "lucide-react";
 
-interface Benefit {
-  icon: LucideIcon;
+interface BenefitFromDB {
+  icon: string;
   title: string;
-  description: string;
+  description: string | null;
 }
 
 interface BenefitsSectionProps {
-  benefits?: Benefit[];
+  benefits?: BenefitFromDB[];
 }
 
-const defaultBenefits: Benefit[] = [
+const defaultBenefits: BenefitFromDB[] = [
   {
-    icon: Zap,
+    icon: "Zap",
     title: "Alta Calidad",
     description: "Materiales premium que garantizan durabilidad y rendimiento excepcional.",
   },
   {
-    icon: Shield,
+    icon: "Shield",
     title: "Garantía Total",
     description: "Protección completa con nuestra garantía de satisfacción.",
   },
   {
-    icon: Sparkles,
+    icon: "Sparkles",
     title: "Diseño Innovador",
     description: "Tecnología de última generación en un diseño elegante y funcional.",
   },
   {
-    icon: Clock,
+    icon: "Clock",
     title: "Envío Rápido",
     description: "Recíbelo en tu puerta en tiempo récord con seguimiento completo.",
   },
   {
-    icon: Heart,
+    icon: "Heart",
     title: "Satisfacción Garantizada",
     description: "Miles de clientes satisfechos avalan la calidad de nuestros productos.",
   },
 ];
+
+// Map icon string to Lucide component
+const getIconComponent = (iconName: string): LucideIcon => {
+  const icons: Record<string, LucideIcon> = {
+    Zap,
+    Shield,
+    Sparkles,
+    Clock,
+    Heart,
+    Check,
+    Battery: (LucideIcons as any).Battery,
+    Headphones: (LucideIcons as any).Headphones,
+    Star: (LucideIcons as any).Star,
+    Volume2: (LucideIcons as any).Volume2,
+    Wifi: (LucideIcons as any).Wifi,
+    Bluetooth: (LucideIcons as any).Bluetooth,
+    Award: (LucideIcons as any).Award,
+    ThumbsUp: (LucideIcons as any).ThumbsUp,
+    Truck: (LucideIcons as any).Truck,
+  };
+  return icons[iconName] || Check;
+};
 
 export const BenefitsSection = ({ benefits = defaultBenefits }: BenefitsSectionProps) => {
   return (
@@ -53,7 +76,7 @@ export const BenefitsSection = ({ benefits = defaultBenefits }: BenefitsSectionP
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
           {benefits.slice(0, 5).map((benefit, index) => {
-            const Icon = benefit.icon;
+            const Icon = getIconComponent(benefit.icon);
             return (
               <div
                 key={index}
@@ -66,7 +89,7 @@ export const BenefitsSection = ({ benefits = defaultBenefits }: BenefitsSectionP
                   {benefit.title}
                 </h3>
                 <p className="text-muted-foreground text-sm leading-relaxed">
-                  {benefit.description}
+                  {benefit.description || ''}
                 </p>
               </div>
             );

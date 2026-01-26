@@ -5,16 +5,17 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 
-interface FAQ {
+interface FAQFromDB {
+  id?: string;
   question: string;
   answer: string;
 }
 
 interface FAQSectionProps {
-  faqs?: FAQ[];
+  faqs?: FAQFromDB[];
 }
 
-const defaultFAQs: FAQ[] = [
+const defaultFAQs: FAQFromDB[] = [
   {
     question: "¿Cuánto tiempo tarda en llegar mi pedido?",
     answer: "El tiempo de envío es de 7 a 20 días hábiles dependiendo de tu ubicación. Recibirás un número de seguimiento para rastrear tu paquete en todo momento.",
@@ -57,8 +58,8 @@ export const FAQSection = ({ faqs = defaultFAQs }: FAQSectionProps) => {
         <Accordion type="single" collapsible className="space-y-4">
           {faqs.map((faq, index) => (
             <AccordionItem
-              key={index}
-              value={`item-${index}`}
+              key={faq.id || index}
+              value={`item-${faq.id || index}`}
               className="bg-background rounded-xl border-none shadow-card overflow-hidden"
             >
               <AccordionTrigger className="px-6 py-4 text-left font-semibold text-foreground hover:no-underline hover:bg-muted/50 transition-colors [&[data-state=open]]:bg-muted/30">
