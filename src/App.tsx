@@ -11,6 +11,7 @@ import ProductPage from "./pages/ProductPage";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminProducts from "./pages/admin/AdminProducts";
 import AdminProductForm from "./pages/admin/AdminProductForm";
+import AdminQuickProduct from "./pages/admin/AdminQuickProduct";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -39,6 +40,16 @@ const App = () => (
               </AdminRoute>
             } />
             <Route path="/admin/productos/nuevo" element={
+              <AdminRoute>
+                <AdminProductForm />
+              </AdminRoute>
+            } />
+            <Route path="/admin/productos/rapido" element={
+              <AdminRoute>
+                <AdminQuickProduct />
+              </AdminRoute>
+            } />
+            <Route path="/admin/productos/:id" element={
               <AdminRoute>
                 <AdminProductForm />
               </AdminRoute>

@@ -29,7 +29,8 @@ import {
   Trash2, 
   ExternalLink,
   Package,
-  Loader2 
+  Loader2,
+  Zap
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
@@ -76,12 +77,20 @@ export default function AdminProducts() {
               Gestiona todos tus productos
             </p>
           </div>
-          <Button asChild>
-            <Link to="/admin/productos/nuevo">
-              <Plus className="h-4 w-4 mr-2" />
-              Crear Producto
-            </Link>
-          </Button>
+          <div className="flex gap-2">
+            <Button asChild variant="outline">
+              <Link to="/admin/productos/rapido">
+                <Zap className="h-4 w-4 mr-2" />
+                Rápido
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link to="/admin/productos/nuevo">
+                <Plus className="h-4 w-4 mr-2" />
+                Crear
+              </Link>
+            </Button>
+          </div>
         </div>
 
         {/* Search */}

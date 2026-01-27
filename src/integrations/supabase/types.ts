@@ -173,6 +173,7 @@ export type Database = {
         Row: {
           affiliate_link: string
           aliexpress_url: string | null
+          category: string | null
           created_at: string
           discount: string | null
           id: string
@@ -191,6 +192,7 @@ export type Database = {
         Insert: {
           affiliate_link: string
           aliexpress_url?: string | null
+          category?: string | null
           created_at?: string
           discount?: string | null
           id?: string
@@ -209,6 +211,7 @@ export type Database = {
         Update: {
           affiliate_link?: string
           aliexpress_url?: string | null
+          category?: string | null
           created_at?: string
           discount?: string | null
           id?: string
