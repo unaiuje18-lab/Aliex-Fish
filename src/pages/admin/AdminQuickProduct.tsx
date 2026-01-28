@@ -92,6 +92,7 @@ interface ScrapedData {
   subtitle: string;
   price: string;
   originalPrice: string;
+  priceRange: string;
   discount: string;
   images: string[];
   rating: number;
@@ -344,8 +345,12 @@ export default function AdminQuickProduct() {
                 )}
                 <div className="flex-1 space-y-2">
                   <h3 className="font-semibold line-clamp-2">{scrapedData.title}</h3>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xl font-bold text-primary">{scrapedData.price}</span>
+                  <div className="flex flex-wrap items-center gap-3">
+                    {scrapedData.priceRange ? (
+                      <span className="text-xl font-bold text-primary">{scrapedData.priceRange}</span>
+                    ) : (
+                      <span className="text-xl font-bold text-primary">{scrapedData.price}</span>
+                    )}
                     {scrapedData.originalPrice && (
                       <span className="text-sm text-muted-foreground line-through">
                         {scrapedData.originalPrice}
