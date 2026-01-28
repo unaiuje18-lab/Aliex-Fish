@@ -12,6 +12,7 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminProducts from "./pages/admin/AdminProducts";
 import AdminProductForm from "./pages/admin/AdminProductForm";
 import AdminQuickProduct from "./pages/admin/AdminQuickProduct";
+import AdminCategories from "./pages/admin/AdminCategories";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -57,6 +58,11 @@ const App = () => (
             <Route path="/admin/productos/:id/editar" element={
               <AdminRoute>
                 <AdminProductForm />
+              </AdminRoute>
+            } />
+            <Route path="/admin/categorias" element={
+              <AdminRoute>
+                <AdminCategories />
               </AdminRoute>
             } />
             

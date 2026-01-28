@@ -8,7 +8,8 @@ import {
   LogOut, 
   Menu,
   X,
-  ExternalLink
+  ExternalLink,
+  FolderOpen
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -20,6 +21,7 @@ interface AdminLayoutProps {
 const navItems = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/productos', label: 'Productos', icon: Package },
+  { href: '/admin/categorias', label: 'Categorías', icon: FolderOpen },
 ];
 
 export function AdminLayout({ children }: AdminLayoutProps) {

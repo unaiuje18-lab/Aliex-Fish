@@ -17,6 +17,7 @@ import {
   useUpdateProductReviews,
   useUpdateProductFAQs
 } from '@/hooks/useProducts';
+import { useCategories } from '@/hooks/useCategories';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Loader2, Save, Plus, Trash2, GripVertical } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -91,6 +92,10 @@ export default function AdminProductForm() {
   const [rating, setRating] = useState('4.5');
   const [reviewCount, setReviewCount] = useState('0');
   const [isPublished, setIsPublished] = useState(false);
+  const [category, setCategory] = useState('otros');
+
+  // Categories
+  const { data: categories } = useCategories();
 
   // Media
   const [mainImageUrl, setMainImageUrl] = useState('');
@@ -118,6 +123,7 @@ export default function AdminProductForm() {
       setIsPublished(existingProduct.is_published);
       setMainImageUrl(existingProduct.main_image_url || '');
       setVideoUrl(existingProduct.video_url || '');
+      setCategory(existingProduct.category || 'otros');
       
       setBenefits(existingProduct.benefits.map(b => ({
         icon: b.icon,
@@ -186,6 +192,7 @@ export default function AdminProductForm() {
         rating: parseFloat(rating) || 4.5,
         review_count: parseInt(reviewCount) || 0,
         is_published: isPublished,
+        category,
       };
 
       if (isEditing && id) {
@@ -396,6 +403,22 @@ export default function AdminProductForm() {
                     onChange={(e) => setAliexpressUrl(e.target.value)}
                     placeholder="https://aliexpress.com/item/..."
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="category">Categoría</Label>
+                  <Select value={category} onValueChange={setCategory}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona categoría" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories?.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.slug}>
+                          {cat.icon} {cat.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </CardContent>
             </Card>

@@ -9,23 +9,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useCreateProduct, useUpdateProductBenefits, useUpdateProductReviews } from '@/hooks/useProducts';
+import { useCategories } from '@/hooks/useCategories';
 import { ArrowLeft, Loader2, Zap, Link as LinkIcon, Check, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
-const CATEGORIES = [
-  { value: 'canas', label: '🎣 Cañas' },
-  { value: 'carretes', label: '🔄 Carretes' },
-  { value: 'boyas', label: '🔴 Boyas' },
-  { value: 'sensuelos', label: '🐟 Señuelos' },
-  { value: 'anzuelos', label: '🪝 Anzuelos' },
-  { value: 'lineas', label: '🧵 Líneas' },
-  { value: 'accesorios', label: '🎒 Accesorios' },
-  { value: 'ropa', label: '👕 Ropa' },
-  { value: 'otros', label: '📦 Otros' },
-];
-
-// Default benefits based on category
+// Default benefits based on category slug
 const DEFAULT_BENEFITS: Record<string, { icon: string; title: string; description: string }[]> = {
   canas: [
     { icon: 'Zap', title: 'Alta Sensibilidad', description: 'Detecta hasta el pique más suave' },
@@ -108,6 +97,9 @@ export default function AdminQuickProduct() {
   const createProduct = useCreateProduct();
   const updateBenefits = useUpdateProductBenefits();
   const updateReviews = useUpdateProductReviews();
+
+  // Categories from database
+  const { data: categories } = useCategories();
 
   const [aliexpressUrl, setAliexpressUrl] = useState('');
   const [category, setCategory] = useState('otros');
@@ -309,9 +301,9 @@ export default function AdminQuickProduct() {
                 <SelectValue placeholder="Selecciona categoría" />
               </SelectTrigger>
               <SelectContent>
-                {CATEGORIES.map((cat) => (
-                  <SelectItem key={cat.value} value={cat.value}>
-                    {cat.label}
+                {categories?.map((cat) => (
+                  <SelectItem key={cat.id} value={cat.slug}>
+                    {cat.icon} {cat.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -382,7 +374,7 @@ export default function AdminQuickProduct() {
                     ⭐ 3-5 reseñas
                   </span>
                   <span className="text-xs bg-secondary px-2 py-1 rounded">
-                    📁 Categoría: {CATEGORIES.find(c => c.value === category)?.label}
+                    📁 Categoría: {categories?.find(c => c.slug === category)?.icon} {categories?.find(c => c.slug === category)?.name}
                   </span>
                 </div>
               </div>
