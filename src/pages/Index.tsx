@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { usePublishedProducts } from '@/hooks/useProducts';
+import { useCategories } from '@/hooks/useCategories';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -8,15 +9,16 @@ import { useAuth } from '@/contexts/AuthContext';
 
 const Index = () => {
   const { data: products, isLoading } = usePublishedProducts();
-  const { isAdmin } = useAuth();
+  const { data: categories, isLoading: categoriesLoading } = useCategories();
+  const { isAdmin, user } = useAuth();
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-background to-muted/30">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
         <div className="container max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link to="/" className="font-bold text-xl">
-            MiTienda
+          <Link to="/" className="font-bold text-xl text-primary">
+            🎣 AliexFISH
           </Link>
           <div className="flex items-center gap-3">
             {isAdmin && (
@@ -28,22 +30,50 @@ const Index = () => {
               </Button>
             )}
             <Button variant="ghost" size="sm" asChild>
-              <Link to="/auth">Iniciar Sesión</Link>
+              <Link to="/auth">{user ? 'Mi Cuenta' : 'Iniciar Sesión'}</Link>
             </Button>
           </div>
         </div>
       </header>
 
       {/* Hero */}
-      <section className="py-16 md:py-24 text-center px-4">
+      <section className="py-12 md:py-16 text-center px-4">
         <div className="container max-w-4xl mx-auto">
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-            Los Mejores Productos al Mejor Precio
+          <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+            Los mejores productos de pesca de todo AliExpress
           </h1>
-          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
-            Descubre productos increíbles seleccionados cuidadosamente para ti, 
-            con los mejores precios directos del fabricante.
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Encuentra los mejores precios en artículos de pesca directamente desde AliExpress. 
+            ¡Equípate como un profesional sin gastar de más!
           </p>
+        </div>
+      </section>
+
+      {/* Categories Navigation */}
+      <section className="pb-8 px-4">
+        <div className="container max-w-6xl mx-auto">
+          <div className="flex flex-wrap justify-center gap-2 md:gap-3">
+            {categoriesLoading ? (
+              Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-10 w-24 rounded-full" />
+              ))
+            ) : categories && categories.length > 0 ? (
+              categories.map((category) => (
+                <Button
+                  key={category.id}
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full hover:bg-primary hover:text-primary-foreground transition-colors"
+                  asChild
+                >
+                  <Link to={`/?categoria=${category.slug}`}>
+                    <span className="mr-1">{category.icon}</span>
+                    {category.name}
+                  </Link>
+                </Button>
+              ))
+            ) : null}
+          </div>
         </div>
       </section>
 
