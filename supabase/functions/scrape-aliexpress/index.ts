@@ -107,63 +107,107 @@ function parseAliExpressData(markdown: string, html: string, metadata: any, orig
   let originalPrice = '';
   let priceRange = '';
   
-  // AliExpress specific price patterns
-  const pricePatterns = [
-    // EUR patterns
-    /€\s*(\d+(?:[.,]\d{1,2})?)/gi,
-    /(\d+(?:[.,]\d{1,2})?)\s*€/gi,
-    /EUR\s*(\d+(?:[.,]\d{1,2})?)/gi,
-    // USD patterns
-    /(?:US\s*)?\$\s*(\d+(?:[.,]\d{1,2})?)/gi,
-    // Price range patterns like "3.51 - 15.99"
-    /(\d+(?:[.,]\d{1,2})?)\s*[-–]\s*(\d+(?:[.,]\d{1,2})?)/g,
-  ];
-
-  const prices: number[] = [];
   const content = markdown + ' ' + (metadata.description || '') + ' ' + (metadata.title || '');
   
-  // First try to find price ranges
-  const rangePattern = /(\d+(?:[.,]\d{1,2})?)\s*[-–]\s*(\d+(?:[.,]\d{1,2})?)\s*(?:€|EUR|\$)?/g;
-  let rangeMatch;
-  while ((rangeMatch = rangePattern.exec(content)) !== null) {
-    const lowPrice = parseFloat(rangeMatch[1].replace(',', '.'));
-    const highPrice = parseFloat(rangeMatch[2].replace(',', '.'));
-    if (lowPrice > 0 && lowPrice < 10000 && highPrice > lowPrice) {
-      priceRange = `${lowPrice.toFixed(2)} - ${highPrice.toFixed(2)}`;
-      prices.push(lowPrice);
-      prices.push(highPrice);
-    }
-  }
+  // AliExpress specific price patterns - ordered by priority
+  // Look for explicit current price patterns first
+  const currentPricePatterns = [
+    // Current price with EUR symbol directly attached
+    /(?:precio|price|ahora|now|sale)[\s:]*€\s*(\d+(?:[.,]\d{1,2})?)/gi,
+    /€\s*(\d+(?:[.,]\d{1,2})?)/g,
+    /(\d+(?:[.,]\d{1,2})?)\s*€/g,
+    /EUR\s*(\d+(?:[.,]\d{1,2})?)/gi,
+    // USD patterns
+    /(?:US\s*)?\$\s*(\d+(?:[.,]\d{1,2})?)/g,
+  ];
+  
+  // Look for original/crossed out price patterns
+  const originalPricePatterns = [
+    /(?:antes|was|original|regular)[\s:]*€?\s*(\d+(?:[.,]\d{1,2})?)/gi,
+    /(?:pvp|rrp)[\s:]*€?\s*(\d+(?:[.,]\d{1,2})?)/gi,
+  ];
 
-  // Then find individual prices
-  for (const pattern of pricePatterns) {
+  const allPrices: number[] = [];
+  const currentPrices: number[] = [];
+  const originalPrices: number[] = [];
+  
+  // First, try to find price ranges like "€1.50 - €15.99" or "1.50 - 15.99"
+  const rangePatterns = [
+    /€?\s*(\d+(?:[.,]\d{1,2})?)\s*[-–]\s*€?\s*(\d+(?:[.,]\d{1,2})?)\s*€?/g,
+    /desde\s*€?\s*(\d+(?:[.,]\d{1,2})?)/gi,
+    /from\s*€?\s*(\d+(?:[.,]\d{1,2})?)/gi,
+  ];
+  
+  for (const pattern of rangePatterns) {
     let match;
-    pattern.lastIndex = 0; // Reset regex
+    pattern.lastIndex = 0;
     while ((match = pattern.exec(content)) !== null) {
-      const priceValue = parseFloat(match[1].replace(',', '.'));
-      if (priceValue > 0 && priceValue < 10000 && !prices.includes(priceValue)) {
-        prices.push(priceValue);
+      const lowPrice = parseFloat(match[1].replace(',', '.'));
+      if (lowPrice > 0 && lowPrice < 10000) {
+        currentPrices.push(lowPrice);
+        allPrices.push(lowPrice);
+      }
+      if (match[2]) {
+        const highPrice = parseFloat(match[2].replace(',', '.'));
+        if (highPrice > 0 && highPrice < 10000) {
+          allPrices.push(highPrice);
+        }
       }
     }
   }
 
-  // Sort prices and determine current/original price
-  if (prices.length > 0) {
-    prices.sort((a, b) => a - b);
-    const lowestPrice = prices[0];
-    const highestPrice = prices[prices.length - 1];
+  // Find current prices
+  for (const pattern of currentPricePatterns) {
+    let match;
+    pattern.lastIndex = 0;
+    while ((match = pattern.exec(content)) !== null) {
+      const priceValue = parseFloat(match[1].replace(',', '.'));
+      if (priceValue > 0 && priceValue < 10000 && !currentPrices.includes(priceValue)) {
+        currentPrices.push(priceValue);
+        allPrices.push(priceValue);
+      }
+    }
+  }
+
+  // Find original prices
+  for (const pattern of originalPricePatterns) {
+    let match;
+    pattern.lastIndex = 0;
+    while ((match = pattern.exec(content)) !== null) {
+      const priceValue = parseFloat(match[1].replace(',', '.'));
+      if (priceValue > 0 && priceValue < 10000 && !originalPrices.includes(priceValue)) {
+        originalPrices.push(priceValue);
+        allPrices.push(priceValue);
+      }
+    }
+  }
+
+  // Determine the actual price to use
+  if (currentPrices.length > 0) {
+    // Sort prices and use the lowest as the current price
+    currentPrices.sort((a, b) => a - b);
+    allPrices.sort((a, b) => a - b);
     
-    // If we have a range, show "desde X€"
-    if (priceRange || (prices.length > 1 && highestPrice > lowestPrice * 1.2)) {
-      price = `${lowestPrice.toFixed(2)}`;
+    const lowestPrice = currentPrices[0];
+    const highestAllPrice = allPrices[allPrices.length - 1];
+    
+    // Check if there are multiple prices indicating a range
+    if (currentPrices.length > 1 && currentPrices[currentPrices.length - 1] > lowestPrice * 1.2) {
       priceRange = `Desde €${lowestPrice.toFixed(2)}`;
-    } else {
-      price = `${lowestPrice.toFixed(2)}`;
     }
     
-    // Set original price if there's a significant difference (likely a discount)
-    if (prices.length > 1 && highestPrice > lowestPrice * 1.3) {
-      originalPrice = `€${highestPrice.toFixed(2)}`;
+    // Use the actual lowest price - this is the REAL AliExpress price
+    price = lowestPrice.toFixed(2);
+    
+    // Set original price only if there's a clear original price
+    if (originalPrices.length > 0) {
+      const highestOriginal = Math.max(...originalPrices);
+      if (highestOriginal > lowestPrice * 1.1) {
+        originalPrice = `€${highestOriginal.toFixed(2)}`;
+      }
+    } else if (highestAllPrice > lowestPrice * 1.5) {
+      // If no explicit original price but there's a much higher price in the data
+      originalPrice = `€${highestAllPrice.toFixed(2)}`;
     }
   }
 
@@ -218,13 +262,17 @@ function parseAliExpressData(markdown: string, html: string, metadata: any, orig
     .replace(/^-|-$/g, '')
     .substring(0, 50);
 
+  // Final price - ensure we have the real price, not a default
+  const finalPrice = price || '0.00';
+  const formattedPrice = `€${finalPrice}`;
+  
   return {
     title: title || 'Producto de Pesca',
     subtitle: metadata.description?.substring(0, 100) || '',
-    price: price ? `€${price}` : '€9.99',
+    price: formattedPrice,
     originalPrice: originalPrice || '',
     priceRange: priceRange || '',
-    discount: originalPrice && price ? calculateDiscount(`€${price}`, originalPrice) : '',
+    discount: originalPrice && price ? calculateDiscount(formattedPrice, originalPrice) : '',
     images: images.slice(0, 5),
     rating,
     reviewCount,

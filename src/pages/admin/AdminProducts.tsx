@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useProducts, useDeleteProduct } from '@/hooks/useProducts';
+import { useProducts, useDeleteProduct, useUpdateProduct } from '@/hooks/useProducts';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Switch } from '@/components/ui/switch';
 import {
   Table,
   TableBody,
@@ -35,18 +37,54 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 
+type StatusFilter = 'all' | 'published' | 'draft';
+
 export default function AdminProducts() {
   const { data: products, isLoading } = useProducts();
   const deleteProduct = useDeleteProduct();
+  const updateProduct = useUpdateProduct();
   const { toast } = useToast();
   
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
-  const filteredProducts = products?.filter(p => 
-    p.title.toLowerCase().includes(search.toLowerCase()) ||
-    p.slug.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredProducts = products?.filter(p => {
+    const matchesSearch = p.title.toLowerCase().includes(search.toLowerCase()) ||
+      p.slug.toLowerCase().includes(search.toLowerCase());
+    
+    if (statusFilter === 'published') {
+      return matchesSearch && p.is_published;
+    } else if (statusFilter === 'draft') {
+      return matchesSearch && !p.is_published;
+    }
+    return matchesSearch;
+  });
+
+  const handleTogglePublish = async (productId: string, currentStatus: boolean) => {
+    setTogglingId(productId);
+    try {
+      await updateProduct.mutateAsync({ 
+        id: productId, 
+        is_published: !currentStatus 
+      });
+      toast({
+        title: currentStatus ? 'Producto despublicado' : 'Producto publicado',
+        description: currentStatus 
+          ? 'El producto ahora es un borrador.' 
+          : 'El producto está visible para todos.',
+      });
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'No se pudo cambiar el estado del producto.',
+      });
+    } finally {
+      setTogglingId(null);
+    }
+  };
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -93,15 +131,33 @@ export default function AdminProducts() {
           </div>
         </div>
 
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar productos..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-10 max-w-sm"
-          />
+        {/* Filters */}
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+          {/* Search */}
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar productos..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          
+          {/* Status Filter Tabs */}
+          <Tabs value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+            <TabsList>
+              <TabsTrigger value="all">
+                Todos ({products?.length || 0})
+              </TabsTrigger>
+              <TabsTrigger value="published">
+                Publicados ({products?.filter(p => p.is_published).length || 0})
+              </TabsTrigger>
+              <TabsTrigger value="draft">
+                Borradores ({products?.filter(p => !p.is_published).length || 0})
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
 
         {/* Table */}
@@ -158,12 +214,23 @@ export default function AdminProducts() {
                       )}
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">
-                      <div className={`inline-flex px-2 py-1 rounded text-xs font-medium ${
-                        product.is_published 
-                          ? 'bg-green-100 text-green-700' 
-                          : 'bg-muted text-muted-foreground'
-                      }`}>
-                        {product.is_published ? 'Publicado' : 'Borrador'}
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={product.is_published}
+                          onCheckedChange={() => handleTogglePublish(product.id, product.is_published)}
+                          disabled={togglingId === product.id}
+                        />
+                        <span className={`text-xs font-medium ${
+                          product.is_published 
+                            ? 'text-green-700' 
+                            : 'text-muted-foreground'
+                        }`}>
+                          {togglingId === product.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            product.is_published ? 'Publicado' : 'Borrador'
+                          )}
+                        </span>
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
