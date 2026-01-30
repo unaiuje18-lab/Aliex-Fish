@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { usePublishedProducts } from '@/hooks/useProducts';
 import { useCategories } from '@/hooks/useCategories';
 import { Button } from '@/components/ui/button';
@@ -8,9 +8,20 @@ import { Star, ShoppingCart, Settings } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 const Index = () => {
+  const [searchParams] = useSearchParams();
+  const selectedCategory = searchParams.get('categoria');
+  
   const { data: products, isLoading } = usePublishedProducts();
   const { data: categories, isLoading: categoriesLoading } = useCategories();
   const { isAdmin, user } = useAuth();
+
+  // Filter products by selected category
+  const filteredProducts = selectedCategory
+    ? products?.filter(product => product.category === selectedCategory)
+    : products;
+
+  // Get the active category name for display
+  const activeCategoryName = categories?.find(c => c.slug === selectedCategory)?.name;
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-background to-muted/30">
@@ -58,20 +69,32 @@ const Index = () => {
                 <Skeleton key={i} className="h-10 w-24 rounded-full" />
               ))
             ) : categories && categories.length > 0 ? (
-              categories.map((category) => (
+              <>
                 <Button
-                  key={category.id}
-                  variant="outline"
+                  variant={!selectedCategory ? "default" : "outline"}
                   size="sm"
-                  className="rounded-full hover:bg-primary hover:text-primary-foreground transition-colors"
+                  className="rounded-full transition-colors"
                   asChild
                 >
-                  <Link to={`/?categoria=${category.slug}`}>
-                    <span className="mr-1">{category.icon}</span>
-                    {category.name}
+                  <Link to="/">
+                    Todos
                   </Link>
                 </Button>
-              ))
+                {categories.map((category) => (
+                  <Button
+                    key={category.id}
+                    variant={selectedCategory === category.slug ? "default" : "outline"}
+                    size="sm"
+                    className="rounded-full transition-colors"
+                    asChild
+                  >
+                    <Link to={`/?categoria=${category.slug}`}>
+                      <span className="mr-1">{category.icon}</span>
+                      {category.name}
+                    </Link>
+                  </Button>
+                ))}
+              </>
             ) : null}
           </div>
         </div>
@@ -81,7 +104,7 @@ const Index = () => {
       <section className="pb-24 px-4">
         <div className="container max-w-6xl mx-auto">
           <h2 className="text-2xl md:text-3xl font-bold mb-8 text-center">
-            Productos Destacados
+            {activeCategoryName ? `${activeCategoryName}` : 'Productos Destacados'}
           </h2>
 
           {isLoading ? (
@@ -97,9 +120,9 @@ const Index = () => {
                 </Card>
               ))}
             </div>
-          ) : products && products.length > 0 ? (
+          ) : filteredProducts && filteredProducts.length > 0 ? (
             <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-              {products.map((product) => (
+              {filteredProducts.map((product) => (
                 <Link 
                   key={product.id} 
                   to={`/producto/${product.slug}`}
