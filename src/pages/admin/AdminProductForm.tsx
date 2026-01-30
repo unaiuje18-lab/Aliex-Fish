@@ -15,13 +15,14 @@ import {
   useUpdateProductBenefits,
   useUpdateProductVideos,
   useUpdateProductReviews,
-  useUpdateProductFAQs
+  useUpdateProductFAQs,
+  useUpdateProductImages
 } from '@/hooks/useProducts';
 import { useCategories } from '@/hooks/useCategories';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Loader2, Save, Plus, Trash2, GripVertical } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { ImageUpload } from '@/components/admin/ImageUpload';
+import { MultiImageUpload } from '@/components/admin/MultiImageUpload';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -79,6 +80,7 @@ export default function AdminProductForm() {
   const updateVideos = useUpdateProductVideos();
   const updateReviews = useUpdateProductReviews();
   const updateFAQs = useUpdateProductFAQs();
+  const updateImages = useUpdateProductImages();
 
   // Basic info
   const [title, setTitle] = useState('');
@@ -98,7 +100,7 @@ export default function AdminProductForm() {
   const { data: categories } = useCategories();
 
   // Media
-  const [mainImageUrl, setMainImageUrl] = useState('');
+  const [productImages, setProductImages] = useState<string[]>([]);
   const [videoUrl, setVideoUrl] = useState('');
 
   // Related data
@@ -121,9 +123,16 @@ export default function AdminProductForm() {
       setRating(String(existingProduct.rating));
       setReviewCount(String(existingProduct.review_count));
       setIsPublished(existingProduct.is_published);
-      setMainImageUrl(existingProduct.main_image_url || '');
       setVideoUrl(existingProduct.video_url || '');
       setCategory(existingProduct.category || 'otros');
+      
+      // Load images from product_images table or fallback to main_image_url
+      const imageUrls = existingProduct.images?.map(img => img.image_url) || [];
+      if (imageUrls.length === 0 && existingProduct.main_image_url) {
+        setProductImages([existingProduct.main_image_url]);
+      } else {
+        setProductImages(imageUrls);
+      }
       
       setBenefits(existingProduct.benefits.map(b => ({
         icon: b.icon,
@@ -161,7 +170,7 @@ export default function AdminProductForm() {
 
   const isSaving = createProduct.isPending || updateProduct.isPending || 
     updateBenefits.isPending || updateVideos.isPending || 
-    updateReviews.isPending || updateFAQs.isPending;
+    updateReviews.isPending || updateFAQs.isPending || updateImages.isPending;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -187,7 +196,7 @@ export default function AdminProductForm() {
         discount: discount || null,
         affiliate_link: affiliateLink,
         aliexpress_url: aliexpressUrl || null,
-        main_image_url: mainImageUrl || null,
+        main_image_url: productImages[0] || null,
         video_url: videoUrl || null,
         rating: parseFloat(rating) || 4.5,
         review_count: parseInt(reviewCount) || 0,
@@ -205,6 +214,10 @@ export default function AdminProductForm() {
       if (productId) {
         // Save related data
         await Promise.all([
+          updateImages.mutateAsync({
+            productId,
+            imageUrls: productImages
+          }),
           updateBenefits.mutateAsync({ 
             productId, 
             benefits: benefits.map((b, i) => ({ ...b, display_order: i })) 
@@ -435,10 +448,11 @@ export default function AdminProductForm() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-2">
-                  <Label>Imagen Principal</Label>
-                  <ImageUpload
-                    value={mainImageUrl}
-                    onChange={setMainImageUrl}
+                  <Label>Imágenes del Producto (máx. 3)</Label>
+                  <MultiImageUpload
+                    images={productImages}
+                    onChange={setProductImages}
+                    maxImages={3}
                   />
                 </div>
 
