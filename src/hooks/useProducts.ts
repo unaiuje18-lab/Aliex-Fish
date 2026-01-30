@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Product, ProductBenefit, ProductVideo, ProductReview, ProductFAQ } from '@/types/database';
+import { Product, ProductBenefit, ProductVideo, ProductReview, ProductFAQ, ProductImage } from '@/types/database';
 
 // Fetch all products (for admin)
 export function useProducts() {
@@ -50,7 +50,12 @@ export function useProduct(slug: string) {
       if (!product) return null;
 
       // Fetch related data in parallel
-      const [benefits, videos, reviews, faqs] = await Promise.all([
+      const [images, benefits, videos, reviews, faqs] = await Promise.all([
+        supabase
+          .from('product_images')
+          .select('*')
+          .eq('product_id', product.id)
+          .order('display_order', { ascending: true }),
         supabase
           .from('product_benefits')
           .select('*')
@@ -75,6 +80,7 @@ export function useProduct(slug: string) {
 
       return {
         ...product,
+        images: (images.data || []) as ProductImage[],
         benefits: (benefits.data || []) as ProductBenefit[],
         videos: (videos.data || []) as ProductVideo[],
         reviews: (reviews.data || []) as ProductReview[],
@@ -100,7 +106,12 @@ export function useProductById(id: string) {
       if (!product) return null;
 
       // Fetch related data in parallel
-      const [benefits, videos, reviews, faqs] = await Promise.all([
+      const [images, benefits, videos, reviews, faqs] = await Promise.all([
+        supabase
+          .from('product_images')
+          .select('*')
+          .eq('product_id', product.id)
+          .order('display_order', { ascending: true }),
         supabase
           .from('product_benefits')
           .select('*')
@@ -125,6 +136,7 @@ export function useProductById(id: string) {
 
       return {
         ...product,
+        images: (images.data || []) as ProductImage[],
         benefits: (benefits.data || []) as ProductBenefit[],
         videos: (videos.data || []) as ProductVideo[],
         reviews: (reviews.data || []) as ProductReview[],
@@ -279,6 +291,32 @@ export function useUpdateProductFAQs() {
         const { error } = await supabase
           .from('product_faqs')
           .insert(faqs.map((f, i) => ({ ...f, product_id: productId, display_order: i })));
+
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['product'] });
+    },
+  });
+}
+
+// Images mutations
+export function useUpdateProductImages() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ productId, imageUrls }: { productId: string; imageUrls: string[] }) => {
+      await supabase.from('product_images').delete().eq('product_id', productId);
+
+      if (imageUrls.length > 0) {
+        const { error } = await supabase
+          .from('product_images')
+          .insert(imageUrls.map((url, i) => ({ 
+            image_url: url, 
+            product_id: productId, 
+            display_order: i 
+          })));
 
         if (error) throw error;
       }
