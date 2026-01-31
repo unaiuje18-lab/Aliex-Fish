@@ -146,6 +146,47 @@ export type Database = {
           },
         ]
       }
+      product_options: {
+        Row: {
+          created_at: string
+          display_order: number | null
+          extra_text: string | null
+          group_title: string
+          id: string
+          option_image_url: string | null
+          option_label: string
+          product_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number | null
+          extra_text?: string | null
+          group_title?: string
+          id?: string
+          option_image_url?: string | null
+          option_label: string
+          product_id: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number | null
+          extra_text?: string | null
+          group_title?: string
+          id?: string
+          option_image_url?: string | null
+          option_label?: string
+          product_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_options_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_reviews: {
         Row: {
           avatar_url: string | null
@@ -183,6 +224,41 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "product_reviews_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_variants: {
+        Row: {
+          created_at: string
+          display_order: number | null
+          id: string
+          price_modifier: string | null
+          product_id: string
+          variant_label: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number | null
+          id?: string
+          price_modifier?: string | null
+          product_id: string
+          variant_label: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number | null
+          id?: string
+          price_modifier?: string | null
+          product_id?: string
+          variant_label?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_variants_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"

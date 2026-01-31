@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Product, ProductBenefit, ProductVideo, ProductReview, ProductFAQ, ProductImage } from '@/types/database';
+import { Product, ProductBenefit, ProductVideo, ProductReview, ProductFAQ, ProductImage, ProductOption, ProductVariant } from '@/types/database';
 
 // Fetch all products (for admin)
 export function useProducts() {
@@ -50,7 +50,7 @@ export function useProduct(slug: string) {
       if (!product) return null;
 
       // Fetch related data in parallel
-      const [images, benefits, videos, reviews, faqs] = await Promise.all([
+      const [images, benefits, videos, reviews, faqs, options, variants] = await Promise.all([
         supabase
           .from('product_images')
           .select('*')
@@ -76,6 +76,16 @@ export function useProduct(slug: string) {
           .select('*')
           .eq('product_id', product.id)
           .order('display_order', { ascending: true }),
+        supabase
+          .from('product_options')
+          .select('*')
+          .eq('product_id', product.id)
+          .order('display_order', { ascending: true }),
+        supabase
+          .from('product_variants')
+          .select('*')
+          .eq('product_id', product.id)
+          .order('display_order', { ascending: true }),
       ]);
 
       return {
@@ -85,6 +95,8 @@ export function useProduct(slug: string) {
         videos: (videos.data || []) as ProductVideo[],
         reviews: (reviews.data || []) as ProductReview[],
         faqs: (faqs.data || []) as ProductFAQ[],
+        options: (options.data || []) as ProductOption[],
+        variants: (variants.data || []) as ProductVariant[],
       };
     },
     enabled: !!slug,
@@ -106,7 +118,7 @@ export function useProductById(id: string) {
       if (!product) return null;
 
       // Fetch related data in parallel
-      const [images, benefits, videos, reviews, faqs] = await Promise.all([
+      const [images, benefits, videos, reviews, faqs, options, variants] = await Promise.all([
         supabase
           .from('product_images')
           .select('*')
@@ -132,6 +144,16 @@ export function useProductById(id: string) {
           .select('*')
           .eq('product_id', product.id)
           .order('display_order', { ascending: true }),
+        supabase
+          .from('product_options')
+          .select('*')
+          .eq('product_id', product.id)
+          .order('display_order', { ascending: true }),
+        supabase
+          .from('product_variants')
+          .select('*')
+          .eq('product_id', product.id)
+          .order('display_order', { ascending: true }),
       ]);
 
       return {
@@ -141,6 +163,8 @@ export function useProductById(id: string) {
         videos: (videos.data || []) as ProductVideo[],
         reviews: (reviews.data || []) as ProductReview[],
         faqs: (faqs.data || []) as ProductFAQ[],
+        options: (options.data || []) as ProductOption[],
+        variants: (variants.data || []) as ProductVariant[],
       };
     },
     enabled: !!id,

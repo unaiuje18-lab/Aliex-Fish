@@ -69,6 +69,26 @@ export interface ProductFAQ {
   created_at: string;
 }
 
+export interface ProductOption {
+  id: string;
+  product_id: string;
+  group_title: string;
+  option_label: string;
+  option_image_url: string | null;
+  extra_text: string | null;
+  display_order: number;
+  created_at: string;
+}
+
+export interface ProductVariant {
+  id: string;
+  product_id: string;
+  variant_label: string;
+  price_modifier: string | null;
+  display_order: number;
+  created_at: string;
+}
+
 export interface UserRole {
   id: string;
   user_id: string;

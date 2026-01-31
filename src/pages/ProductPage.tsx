@@ -1,6 +1,8 @@
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useProduct } from '@/hooks/useProducts';
-import { HeroSection } from '@/components/landing/HeroSection';
+import { ProductImageGallery } from '@/components/product/ProductImageGallery';
+import { ProductOptions } from '@/components/product/ProductOptions';
+import { ProductVariants } from '@/components/product/ProductVariants';
 import { BenefitsSection } from '@/components/landing/BenefitsSection';
 import { VideoGallery } from '@/components/landing/VideoGallery';
 import { ReviewsSection } from '@/components/landing/ReviewsSection';
@@ -11,23 +13,25 @@ import { StickyMobileCTA } from '@/components/landing/StickyMobileCTA';
 import { Footer } from '@/components/landing/Footer';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Package } from 'lucide-react';
+import { ArrowLeft, Home, Package, ShoppingCart, Star, Truck, Shield, RotateCcw } from 'lucide-react';
 
 export default function ProductPage() {
   const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
   const { data: product, isLoading, error } = useProduct(slug || '');
 
   if (isLoading) {
     return (
       <main className="min-h-screen bg-background">
-        <div className="container max-w-4xl mx-auto px-4 py-16">
-          <Skeleton className="h-[400px] w-full rounded-xl mb-8" />
-          <Skeleton className="h-8 w-3/4 mb-4" />
-          <Skeleton className="h-6 w-1/2 mb-8" />
-          <div className="grid gap-4">
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-24 w-full" />
+        <div className="container max-w-6xl mx-auto px-4 py-8">
+          <div className="grid lg:grid-cols-2 gap-8">
+            <Skeleton className="aspect-square rounded-xl" />
+            <div className="space-y-4">
+              <Skeleton className="h-8 w-3/4" />
+              <Skeleton className="h-6 w-1/2" />
+              <Skeleton className="h-12 w-1/3" />
+              <Skeleton className="h-24 w-full" />
+            </div>
           </div>
         </div>
       </main>
@@ -45,7 +49,7 @@ export default function ProductPage() {
           </p>
           <Button asChild>
             <Link to="/">
-              <ArrowLeft className="h-4 w-4 mr-2" />
+              <Home className="h-4 w-4 mr-2" />
               Volver al inicio
             </Link>
           </Button>
@@ -54,21 +58,148 @@ export default function ProductPage() {
     );
   }
 
+  const handleBuyClick = () => {
+    window.open(product.affiliate_link, "_blank", "noopener,noreferrer");
+  };
+
   return (
-    <main className="min-h-screen">
-      {/* Hero */}
-      <HeroSection
-        title={product.title}
-        subtitle={product.subtitle || ''}
-        price={product.price}
-        originalPrice={product.original_price || ''}
-        discount={product.discount || ''}
-        imageUrl={product.main_image_url || ''}
-        videoUrl={product.video_url || ''}
-        affiliateLink={product.affiliate_link}
-        rating={product.rating}
-        reviewCount={product.review_count}
-      />
+    <main className="min-h-screen bg-background">
+      {/* Navigation buttons */}
+      <div className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
+        <div className="container max-w-6xl mx-auto px-4 py-3">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate(-1)}
+              className="gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Atrás
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              asChild
+              className="gap-2"
+            >
+              <Link to="/">
+                <Home className="h-4 w-4" />
+                Inicio
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Product Section - AliExpress Style */}
+      <section className="py-8">
+        <div className="container max-w-6xl mx-auto px-4">
+          <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
+            {/* Left - Image Gallery */}
+            <div>
+              <ProductImageGallery
+                images={product.images || []}
+                mainImage={product.main_image_url || undefined}
+                productTitle={product.title}
+              />
+            </div>
+
+            {/* Right - Product Info */}
+            <div className="space-y-6">
+              {/* Rating */}
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
+                  {[...Array(5)].map((_, i) => (
+                    <Star
+                      key={i}
+                      className={`w-4 h-4 ${
+                        i < Math.floor(product.rating || 4.5)
+                          ? "text-warning fill-warning"
+                          : "text-muted-foreground"
+                      }`}
+                    />
+                  ))}
+                </div>
+                <span className="text-sm font-medium">{product.rating || 4.5}</span>
+                <span className="text-sm text-muted-foreground">
+                  ({(product.review_count || 0).toLocaleString()} opiniones)
+                </span>
+              </div>
+
+              {/* Title */}
+              <h1 className="text-2xl md:text-3xl font-bold text-foreground leading-tight">
+                {product.title}
+              </h1>
+
+              {product.subtitle && (
+                <p className="text-muted-foreground">{product.subtitle}</p>
+              )}
+
+              {/* Price */}
+              <div className="bg-gradient-to-r from-destructive/10 to-destructive/5 p-4 rounded-xl">
+                <div className="flex items-baseline gap-3 flex-wrap">
+                  <span className="text-3xl md:text-4xl font-bold text-destructive">
+                    {product.price}
+                  </span>
+                  {product.original_price && (
+                    <span className="text-lg text-muted-foreground line-through">
+                      {product.original_price}
+                    </span>
+                  )}
+                  {product.discount && (
+                    <span className="text-sm font-bold text-white bg-destructive px-2 py-1 rounded">
+                      -{product.discount}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Options */}
+              {product.options && product.options.length > 0 && (
+                <ProductOptions options={product.options} />
+              )}
+
+              {/* Variants */}
+              {product.variants && product.variants.length > 0 && (
+                <ProductVariants variants={product.variants} />
+              )}
+
+              {/* Trust badges */}
+              <div className="flex flex-wrap gap-4 py-2 border-y">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Truck className="w-4 h-4 text-success" />
+                  <span>Envío a todo el mundo</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Shield className="w-4 h-4 text-trust" />
+                  <span>Compra segura</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <RotateCcw className="w-4 h-4 text-primary" />
+                  <span>Garantía incluida</span>
+                </div>
+              </div>
+
+              {/* CTA Button */}
+              <div className="space-y-3">
+                <Button
+                  variant="cta"
+                  size="xl"
+                  onClick={handleBuyClick}
+                  className="w-full"
+                >
+                  <ShoppingCart className="w-5 h-5" />
+                  Comprar Ahora
+                </Button>
+                <p className="text-xs text-muted-foreground text-center">
+                  🔒 Pago 100% seguro • Envío rápido
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Benefits */}
       {product.benefits && product.benefits.length > 0 && (
