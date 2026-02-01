@@ -15,7 +15,13 @@ import AdminQuickProduct from "./pages/admin/AdminQuickProduct";
 import AdminCategories from "./pages/admin/AdminCategories";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
