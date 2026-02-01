@@ -15,6 +15,32 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Home, Package, ShoppingCart, Star, Truck, Shield, RotateCcw } from 'lucide-react';
 
+// Component for images with titles
+function TitledImagesSection({ images }: { images: { id: string; image_url: string; title?: string | null }[] }) {
+  const titledImages = images.filter(img => img.title);
+  
+  if (titledImages.length === 0) return null;
+  
+  return (
+    <div className="space-y-4">
+      {titledImages.map((img) => (
+        <div key={img.id} className="space-y-1">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            {img.title}
+          </p>
+          <div className="rounded-lg overflow-hidden border bg-muted">
+            <img
+              src={img.image_url}
+              alt={img.title || 'Imagen del producto'}
+              className="w-full h-auto object-contain max-h-48"
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function ProductPage() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
@@ -181,6 +207,11 @@ export default function ProductPage() {
                 </div>
               </div>
 
+              {/* Images with titles */}
+              {product.images && product.images.length > 0 && (
+                <TitledImagesSection images={product.images} />
+              )}
+
               {/* CTA Button */}
               <div className="space-y-3">
                 <Button
@@ -193,7 +224,7 @@ export default function ProductPage() {
                   Comprar Ahora
                 </Button>
                 <p className="text-xs text-muted-foreground text-center">
-                  🔒 Pago 100% seguro • Envío rápido
+                  Pago 100% seguro - Envío rápido
                 </p>
               </div>
             </div>

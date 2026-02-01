@@ -326,18 +326,24 @@ export function useUpdateProductFAQs() {
 }
 
 // Images mutations
+export interface ImageData {
+  url: string;
+  title?: string | null;
+}
+
 export function useUpdateProductImages() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ productId, imageUrls }: { productId: string; imageUrls: string[] }) => {
+    mutationFn: async ({ productId, images }: { productId: string; images: ImageData[] }) => {
       await supabase.from('product_images').delete().eq('product_id', productId);
 
-      if (imageUrls.length > 0) {
+      if (images.length > 0) {
         const { error } = await supabase
           .from('product_images')
-          .insert(imageUrls.map((url, i) => ({ 
-            image_url: url, 
+          .insert(images.map((img, i) => ({ 
+            image_url: img.url, 
+            title: img.title || null,
             product_id: productId, 
             display_order: i 
           })));

@@ -22,7 +22,7 @@ import { useCategories } from '@/hooks/useCategories';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Loader2, Save, Plus, Trash2, GripVertical } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { MultiImageUpload } from '@/components/admin/MultiImageUpload';
+import { MultiImageUpload, ImageItem } from '@/components/admin/MultiImageUpload';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -100,7 +100,7 @@ export default function AdminProductForm() {
   const { data: categories } = useCategories();
 
   // Media
-  const [productImages, setProductImages] = useState<string[]>([]);
+  const [productImages, setProductImages] = useState<ImageItem[]>([]);
   const [videoUrl, setVideoUrl] = useState('');
 
   // Related data
@@ -127,11 +127,14 @@ export default function AdminProductForm() {
       setCategory(existingProduct.category || 'otros');
       
       // Load images from product_images table or fallback to main_image_url
-      const imageUrls = existingProduct.images?.map(img => img.image_url) || [];
-      if (imageUrls.length === 0 && existingProduct.main_image_url) {
-        setProductImages([existingProduct.main_image_url]);
+      const imageItems: ImageItem[] = existingProduct.images?.map(img => ({
+        url: img.image_url,
+        title: img.title || ''
+      })) || [];
+      if (imageItems.length === 0 && existingProduct.main_image_url) {
+        setProductImages([{ url: existingProduct.main_image_url, title: '' }]);
       } else {
-        setProductImages(imageUrls);
+        setProductImages(imageItems);
       }
       
       setBenefits(existingProduct.benefits.map(b => ({
@@ -196,7 +199,7 @@ export default function AdminProductForm() {
         discount: discount || null,
         affiliate_link: affiliateLink,
         aliexpress_url: aliexpressUrl || null,
-        main_image_url: productImages[0] || null,
+        main_image_url: productImages[0]?.url || null,
         video_url: videoUrl || null,
         rating: parseFloat(rating) || 4.5,
         review_count: parseInt(reviewCount) || 0,
@@ -216,7 +219,7 @@ export default function AdminProductForm() {
         await Promise.all([
           updateImages.mutateAsync({
             productId,
-            imageUrls: productImages
+            images: productImages.map(img => ({ url: img.url, title: img.title || null }))
           }),
           updateBenefits.mutateAsync({ 
             productId, 
@@ -448,11 +451,11 @@ export default function AdminProductForm() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-2">
-                  <Label>Imágenes del Producto (máx. 3)</Label>
+                  <Label>Imágenes del Producto</Label>
                   <MultiImageUpload
                     images={productImages}
                     onChange={setProductImages}
-                    maxImages={3}
+                    maxImages={20}
                   />
                 </div>
 

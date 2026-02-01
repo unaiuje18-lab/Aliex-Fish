@@ -5,18 +5,18 @@ import { Input } from '@/components/ui/input';
 import { Upload, X, Loader2, Image as ImageIcon, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-interface ImageItem {
+export interface ImageItem {
   url: string;
-  isUploading?: boolean;
+  title?: string;
 }
 
 interface MultiImageUploadProps {
-  images: string[];
-  onChange: (urls: string[]) => void;
+  images: ImageItem[];
+  onChange: (images: ImageItem[]) => void;
   maxImages?: number;
 }
 
-export function MultiImageUpload({ images, onChange, maxImages = 3 }: MultiImageUploadProps) {
+export function MultiImageUpload({ images, onChange, maxImages = 20 }: MultiImageUploadProps) {
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
   const [urlInputValue, setUrlInputValue] = useState('');
   const { toast } = useToast();
@@ -65,9 +65,9 @@ export function MultiImageUpload({ images, onChange, maxImages = 3 }: MultiImage
 
       const newImages = [...images];
       if (index !== undefined) {
-        newImages[index] = publicUrl;
+        newImages[index] = { ...newImages[index], url: publicUrl };
       } else {
-        newImages.push(publicUrl);
+        newImages.push({ url: publicUrl, title: '' });
       }
       onChange(newImages);
 
@@ -92,9 +92,15 @@ export function MultiImageUpload({ images, onChange, maxImages = 3 }: MultiImage
     onChange(newImages);
   };
 
+  const handleTitleChange = (index: number, title: string) => {
+    const newImages = [...images];
+    newImages[index] = { ...newImages[index], title };
+    onChange(newImages);
+  };
+
   const handleAddUrl = () => {
     if (urlInputValue.trim() && images.length < maxImages) {
-      onChange([...images, urlInputValue.trim()]);
+      onChange([...images, { url: urlInputValue.trim(), title: '' }]);
       setUrlInputValue('');
     }
   };
@@ -105,25 +111,39 @@ export function MultiImageUpload({ images, onChange, maxImages = 3 }: MultiImage
     <div className="space-y-4">
       {/* Current images grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-        {images.map((url, index) => (
-          <div key={index} className="relative group">
-            <img
-              src={url}
-              alt={`Imagen ${index + 1}`}
-              className="w-full aspect-square object-cover rounded-lg border"
-            />
-            <Button
-              type="button"
-              variant="destructive"
-              size="icon"
-              className="absolute -top-2 -right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-              onClick={() => handleRemove(index)}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-            <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
-              {index === 0 ? 'Principal' : `Imagen ${index + 1}`}
+        {images.map((img, index) => (
+          <div key={index} className="relative group space-y-2">
+            <div className="relative">
+              <img
+                src={img.url}
+                alt={img.title || `Imagen ${index + 1}`}
+                className="w-full aspect-square object-cover rounded-lg border"
+              />
+              <Button
+                type="button"
+                variant="destructive"
+                size="icon"
+                className="absolute -top-2 -right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={() => handleRemove(index)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+              <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                {index === 0 ? 'Principal' : `Imagen ${index + 1}`}
+              </div>
             </div>
+            {/* Title input for each image */}
+            <Input
+              value={img.title || ''}
+              onChange={(e) => handleTitleChange(index, e.target.value)}
+              placeholder="Título de la imagen (opcional)"
+              className="text-sm"
+            />
+            {img.title && (
+              <p className="text-xs text-muted-foreground">
+                Esta imagen se mostrará junto al botón de compra
+              </p>
+            )}
           </div>
         ))}
 
@@ -189,6 +209,7 @@ export function MultiImageUpload({ images, onChange, maxImages = 3 }: MultiImage
 
       <p className="text-xs text-muted-foreground">
         Puedes subir hasta {maxImages} imágenes. La primera será la imagen principal.
+        Las imágenes con título se mostrarán junto al botón de compra.
       </p>
     </div>
   );
