@@ -100,7 +100,7 @@ export default function AdminProductForm() {
   const { data: categories } = useCategories();
 
   // Media
-  const [productImages, setProductImages] = useState<string[]>([]);
+  const [productImages, setProductImages] = useState<{ url: string; title: string }[]>([]);
   const [videoUrl, setVideoUrl] = useState('');
 
   // Related data
@@ -127,11 +127,14 @@ export default function AdminProductForm() {
       setCategory(existingProduct.category || 'otros');
       
       // Load images from product_images table or fallback to main_image_url
-      const imageUrls = existingProduct.images?.map(img => img.image_url) || [];
-      if (imageUrls.length === 0 && existingProduct.main_image_url) {
-        setProductImages([existingProduct.main_image_url]);
+      const imagesWithTitles = existingProduct.images?.map(img => ({
+        url: img.image_url,
+        title: img.title || ''
+      })) || [];
+      if (imagesWithTitles.length === 0 && existingProduct.main_image_url) {
+        setProductImages([{ url: existingProduct.main_image_url, title: '' }]);
       } else {
-        setProductImages(imageUrls);
+        setProductImages(imagesWithTitles);
       }
       
       setBenefits(existingProduct.benefits.map(b => ({
@@ -196,7 +199,7 @@ export default function AdminProductForm() {
         discount: discount || null,
         affiliate_link: affiliateLink,
         aliexpress_url: aliexpressUrl || null,
-        main_image_url: productImages[0] || null,
+        main_image_url: productImages[0]?.url || null,
         video_url: videoUrl || null,
         rating: parseFloat(rating) || 4.5,
         review_count: parseInt(reviewCount) || 0,
@@ -216,7 +219,7 @@ export default function AdminProductForm() {
         await Promise.all([
           updateImages.mutateAsync({
             productId,
-            imageUrls: productImages
+            images: productImages
           }),
           updateBenefits.mutateAsync({ 
             productId, 
@@ -448,11 +451,10 @@ export default function AdminProductForm() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-2">
-                  <Label>Imágenes del Producto (máx. 3)</Label>
+                  <Label>Imágenes del Producto</Label>
                   <MultiImageUpload
                     images={productImages}
                     onChange={setProductImages}
-                    maxImages={3}
                   />
                 </div>
 

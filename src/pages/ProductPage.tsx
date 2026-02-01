@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useProduct } from '@/hooks/useProducts';
 import { ProductImageGallery } from '@/components/product/ProductImageGallery';
@@ -19,6 +20,7 @@ export default function ProductPage() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const { data: product, isLoading, error } = useProduct(slug || '');
+  const [selectedImageTitle, setSelectedImageTitle] = useState<string | null>(null);
 
   if (isLoading) {
     return (
@@ -102,6 +104,7 @@ export default function ProductPage() {
                 images={product.images || []}
                 mainImage={product.main_image_url || undefined}
                 productTitle={product.title}
+                onImageSelect={(img) => setSelectedImageTitle(img?.title || null)}
               />
             </div>
 
@@ -137,7 +140,7 @@ export default function ProductPage() {
               )}
 
               {/* Price */}
-              <div className="bg-gradient-to-r from-destructive/10 to-destructive/5 p-4 rounded-xl">
+              <div className="bg-gradient-to-r from-destructive/10 to-destructive/5 p-4 rounded-xl space-y-2">
                 <div className="flex items-baseline gap-3 flex-wrap">
                   <span className="text-3xl md:text-4xl font-bold text-destructive">
                     {product.price}
@@ -153,6 +156,12 @@ export default function ProductPage() {
                     </span>
                   )}
                 </div>
+                {/* Selected image title */}
+                {selectedImageTitle && (
+                  <p className="text-sm font-medium text-foreground border-t border-destructive/20 pt-2">
+                    {selectedImageTitle}
+                  </p>
+                )}
               </div>
 
               {/* Options */}
