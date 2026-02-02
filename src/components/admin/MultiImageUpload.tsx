@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 interface ImageWithTitle {
   url: string;
   title: string;
+  price: string;
 }
 
 interface MultiImageUploadProps {
@@ -67,7 +68,7 @@ export function MultiImageUpload({ images, onChange, maxImages = 99 }: MultiImag
       if (index !== undefined) {
         newImages[index] = { ...newImages[index], url: publicUrl };
       } else {
-        newImages.push({ url: publicUrl, title: '' });
+        newImages.push({ url: publicUrl, title: '', price: '' });
       }
       onChange(newImages);
 
@@ -98,9 +99,15 @@ export function MultiImageUpload({ images, onChange, maxImages = 99 }: MultiImag
     onChange(newImages);
   };
 
+  const handlePriceChange = (index: number, price: string) => {
+    const newImages = [...images];
+    newImages[index] = { ...newImages[index], price };
+    onChange(newImages);
+  };
+
   const handleAddUrl = () => {
     if (urlInputValue.trim() && images.length < maxImages) {
-      onChange([...images, { url: urlInputValue.trim(), title: '' }]);
+      onChange([...images, { url: urlInputValue.trim(), title: '', price: '' }]);
       setUrlInputValue('');
     }
   };
@@ -135,7 +142,13 @@ export function MultiImageUpload({ images, onChange, maxImages = 99 }: MultiImag
             <Input
               value={image.title}
               onChange={(e) => handleTitleChange(index, e.target.value)}
-              placeholder="Título opcional (ej: Color Rojo)"
+              placeholder="Título (ej: Coche Rojo)"
+              className="text-sm"
+            />
+            <Input
+              value={image.price}
+              onChange={(e) => handlePriceChange(index, e.target.value)}
+              placeholder="Precio (ej: 49,99€)"
               className="text-sm"
             />
           </div>
@@ -202,7 +215,7 @@ export function MultiImageUpload({ images, onChange, maxImages = 99 }: MultiImag
       )}
 
       <p className="text-xs text-muted-foreground">
-        Puedes subir imágenes ilimitadas. La primera será la imagen principal. Añade títulos opcionales para mostrarlos en la galería.
+        Imagen + Título + Precio. El precio de cada imagen se mostrará automáticamente al seleccionarla.
       </p>
     </div>
   );

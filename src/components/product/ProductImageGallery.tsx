@@ -6,6 +6,7 @@ interface ProductImage {
   id: string;
   image_url: string;
   title?: string | null;
+  price?: string | null;
 }
 
 interface ProductImageGalleryProps {

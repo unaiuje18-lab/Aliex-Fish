@@ -330,7 +330,7 @@ export function useUpdateProductImages() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ productId, images }: { productId: string; images: { url: string; title: string }[] }) => {
+    mutationFn: async ({ productId, images }: { productId: string; images: { url: string; title: string; price: string }[] }) => {
       await supabase.from('product_images').delete().eq('product_id', productId);
 
       if (images.length > 0) {
@@ -339,6 +339,7 @@ export function useUpdateProductImages() {
           .insert(images.map((img, i) => ({ 
             image_url: img.url, 
             title: img.title || null,
+            price: img.price || null,
             product_id: productId, 
             display_order: i 
           })));
