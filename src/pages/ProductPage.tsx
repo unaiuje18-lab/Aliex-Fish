@@ -21,6 +21,7 @@ export default function ProductPage() {
   const navigate = useNavigate();
   const { data: product, isLoading, error } = useProduct(slug || '');
   const [selectedImageTitle, setSelectedImageTitle] = useState<string | null>(null);
+  const [selectedImagePrice, setSelectedImagePrice] = useState<string | null>(null);
 
   if (isLoading) {
     return (
@@ -104,7 +105,10 @@ export default function ProductPage() {
                 images={product.images || []}
                 mainImage={product.main_image_url || undefined}
                 productTitle={product.title}
-                onImageSelect={(img) => setSelectedImageTitle(img?.title || null)}
+                onImageSelect={(img) => {
+                  setSelectedImageTitle(img?.title || null);
+                  setSelectedImagePrice(img?.price || null);
+                }}
               />
             </div>
 
@@ -143,14 +147,14 @@ export default function ProductPage() {
               <div className="bg-gradient-to-r from-destructive/10 to-destructive/5 p-4 rounded-xl space-y-2">
                 <div className="flex items-baseline gap-3 flex-wrap">
                   <span className="text-3xl md:text-4xl font-bold text-destructive">
-                    {product.price}
+                    {selectedImagePrice || product.price}
                   </span>
-                  {product.original_price && (
+                  {!selectedImagePrice && product.original_price && (
                     <span className="text-lg text-muted-foreground line-through">
                       {product.original_price}
                     </span>
                   )}
-                  {product.discount && (
+                  {!selectedImagePrice && product.discount && (
                     <span className="text-sm font-bold text-white bg-destructive px-2 py-1 rounded">
                       -{product.discount}
                     </span>

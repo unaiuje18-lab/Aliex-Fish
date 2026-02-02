@@ -25,6 +25,7 @@ export interface ProductImage {
   product_id: string;
   image_url: string;
   title: string | null;
+  price: string | null;
   display_order: number;
   created_at: string;
 }

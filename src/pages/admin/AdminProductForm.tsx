@@ -100,7 +100,7 @@ export default function AdminProductForm() {
   const { data: categories } = useCategories();
 
   // Media
-  const [productImages, setProductImages] = useState<{ url: string; title: string }[]>([]);
+  const [productImages, setProductImages] = useState<{ url: string; title: string; price: string }[]>([]);
   const [videoUrl, setVideoUrl] = useState('');
 
   // Related data
@@ -129,10 +129,11 @@ export default function AdminProductForm() {
       // Load images from product_images table or fallback to main_image_url
       const imagesWithTitles = existingProduct.images?.map(img => ({
         url: img.image_url,
-        title: img.title || ''
+        title: img.title || '',
+        price: img.price || ''
       })) || [];
       if (imagesWithTitles.length === 0 && existingProduct.main_image_url) {
-        setProductImages([{ url: existingProduct.main_image_url, title: '' }]);
+        setProductImages([{ url: existingProduct.main_image_url, title: '', price: '' }]);
       } else {
         setProductImages(imagesWithTitles);
       }

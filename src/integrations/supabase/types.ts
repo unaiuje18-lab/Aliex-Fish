@@ -120,6 +120,7 @@ export type Database = {
           display_order: number | null
           id: string
           image_url: string
+          price: string | null
           product_id: string
           title: string | null
         }
@@ -128,6 +129,7 @@ export type Database = {
           display_order?: number | null
           id?: string
           image_url: string
+          price?: string | null
           product_id: string
           title?: string | null
         }
@@ -136,6 +138,7 @@ export type Database = {
           display_order?: number | null
           id?: string
           image_url?: string
+          price?: string | null
           product_id?: string
           title?: string | null
         }
