@@ -22,10 +22,12 @@ export function ProductImageGallery({
   productTitle,
   onImageSelect 
 }: ProductImageGalleryProps) {
-  // Combine main image with additional images
-  const allImages: ProductImage[] = mainImage 
-    ? [{ id: 'main', image_url: mainImage, title: null }, ...images.filter(img => img.image_url !== mainImage)]
-    : images;
+  // Use images directly - no need to add main image separately as it should be part of images array
+  const allImages: ProductImage[] = images.length > 0 
+    ? images 
+    : mainImage 
+      ? [{ id: 'main', image_url: mainImage, title: null, price: null }]
+      : [];
   
   const [selectedIndex, setSelectedIndex] = useState(0);
   const selectedImage = allImages[selectedIndex];
