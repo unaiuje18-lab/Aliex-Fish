@@ -1,1 +1,4 @@
 project_id = "rfdicmjgevkwhvrognmq"
+
+[functions.scrape-aliexpress]
+verify_jwt = false
