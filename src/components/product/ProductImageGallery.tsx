@@ -13,6 +13,7 @@ interface ProductImageGalleryProps {
   images: ProductImage[];
   mainImage?: string;
   productTitle: string;
+  selectedImageId?: string | null;
   onImageSelect?: (image: ProductImage | null) => void;
 }
 
@@ -20,6 +21,7 @@ export function ProductImageGallery({
   images, 
   mainImage, 
   productTitle,
+  selectedImageId,
   onImageSelect 
 }: ProductImageGalleryProps) {
   // Use images directly - no need to add main image separately as it should be part of images array
@@ -29,13 +31,19 @@ export function ProductImageGallery({
       ? [{ id: 'main', image_url: mainImage, title: null, price: null }]
       : [];
   
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  // Find the index of the selected image by ID, or default to 0
+  const selectedByIdIndex = selectedImageId 
+    ? allImages.findIndex(img => img.id === selectedImageId)
+    : -1;
+  
+  const [internalSelectedIndex, setInternalSelectedIndex] = useState(0);
+  const selectedIndex = selectedByIdIndex >= 0 ? selectedByIdIndex : internalSelectedIndex;
   const selectedImage = allImages[selectedIndex];
   const [thumbScrollPos, setThumbScrollPos] = useState(0);
   const visibleThumbs = 5;
 
   const handleSelect = (index: number) => {
-    setSelectedIndex(index);
+    setInternalSelectedIndex(index);
     onImageSelect?.(allImages[index] || null);
   };
 

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useProduct } from '@/hooks/useProducts';
 import { ProductImageGallery } from '@/components/product/ProductImageGallery';
+import { ProductVariantImages } from '@/components/product/ProductVariantImages';
 import { ProductOptions } from '@/components/product/ProductOptions';
 import { ProductVariants } from '@/components/product/ProductVariants';
 import { BenefitsSection } from '@/components/landing/BenefitsSection';
@@ -20,6 +21,7 @@ export default function ProductPage() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const { data: product, isLoading, error } = useProduct(slug || '');
+  const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
   const [selectedImageTitle, setSelectedImageTitle] = useState<string | null>(null);
   const [selectedImagePrice, setSelectedImagePrice] = useState<string | null>(null);
 
@@ -105,7 +107,9 @@ export default function ProductPage() {
                 images={product.images || []}
                 mainImage={product.main_image_url || undefined}
                 productTitle={product.title}
+                selectedImageId={selectedImageId}
                 onImageSelect={(img) => {
+                  setSelectedImageId(img?.id || null);
                   setSelectedImageTitle(img?.title || null);
                   setSelectedImagePrice(img?.price || null);
                 }}
@@ -144,9 +148,9 @@ export default function ProductPage() {
               )}
 
               {/* Price */}
-              <div className="bg-gradient-to-r from-destructive/10 to-destructive/5 p-4 rounded-xl space-y-2">
+              <div className="bg-muted/50 p-4 rounded-xl space-y-2">
                 <div className="flex items-baseline gap-3 flex-wrap">
-                  <span className="text-3xl md:text-4xl font-bold text-destructive">
+                  <span className="text-3xl md:text-4xl font-bold text-foreground">
                     {selectedImagePrice || product.price}
                   </span>
                   {!selectedImagePrice && product.original_price && (
@@ -155,18 +159,31 @@ export default function ProductPage() {
                     </span>
                   )}
                   {!selectedImagePrice && product.discount && (
-                    <span className="text-sm font-bold text-white bg-destructive px-2 py-1 rounded">
-                      -{product.discount}
+                    <span className="text-sm font-medium text-success bg-success/10 px-2 py-1 rounded">
+                      Ahorra {product.discount}
                     </span>
                   )}
                 </div>
                 {/* Selected image title */}
                 {selectedImageTitle && (
-                  <p className="text-sm font-medium text-foreground border-t border-destructive/20 pt-2">
+                  <p className="text-sm font-medium text-foreground border-t border-border pt-2">
                     {selectedImageTitle}
                   </p>
                 )}
               </div>
+
+              {/* Image Variants Grid (if images have titles) */}
+              {product.images && product.images.some(img => img.title) && (
+                <ProductVariantImages
+                  images={product.images}
+                  selectedId={selectedImageId || product.images[0]?.id}
+                  onSelect={(img) => {
+                    setSelectedImageId(img.id);
+                    setSelectedImageTitle(img.title || null);
+                    setSelectedImagePrice(img.price || null);
+                  }}
+                />
+              )}
 
               {/* Options */}
               {product.options && product.options.length > 0 && (
