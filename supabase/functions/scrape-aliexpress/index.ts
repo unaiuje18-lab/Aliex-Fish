@@ -1,16 +1,64 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    // ============ AUTHENTICATION CHECK ============
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Unauthorized - No token provided' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    // Verify the JWT token
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    
+    if (claimsError || !claimsData?.claims) {
+      console.error('Token validation failed:', claimsError);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invalid or expired token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const userId = claimsData.claims.sub;
+
+    // ============ ADMIN ROLE CHECK ============
+    const { data: roleData, error: roleError } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .eq('role', 'admin')
+      .maybeSingle();
+
+    if (roleError || !roleData) {
+      console.error('Admin check failed:', roleError);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Admin access required' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('Admin authenticated:', userId);
+
+    // ============ MAIN LOGIC ============
     const { url } = await req.json();
 
     if (!url) {
@@ -86,9 +134,9 @@ serve(async (req) => {
   }
 });
 
-function parseAliExpressData(markdown: string, html: string, metadata: any, originalUrl: string) {
+function parseAliExpressData(markdown: string, html: string, metadata: Record<string, unknown>, originalUrl: string) {
   // Extract title from metadata or content
-  let title = metadata.title || '';
+  let title = (metadata.title as string) || '';
   
   // Clean up common AliExpress title patterns
   title = title.replace(/\s*[-|]\s*AliExpress.*$/i, '').trim();
@@ -107,7 +155,7 @@ function parseAliExpressData(markdown: string, html: string, metadata: any, orig
   let originalPrice = '';
   let priceRange = '';
   
-  const content = markdown + ' ' + (metadata.description || '') + ' ' + (metadata.title || '');
+  const content = markdown + ' ' + ((metadata.description as string) || '') + ' ' + ((metadata.title as string) || '');
   
   // AliExpress specific price patterns - ordered by priority
   // Look for explicit current price patterns first
@@ -216,7 +264,7 @@ function parseAliExpressData(markdown: string, html: string, metadata: any, orig
   
   // Check og:image
   if (metadata.ogImage) {
-    images.push(metadata.ogImage);
+    images.push(metadata.ogImage as string);
   }
   
   // Extract image URLs from HTML/markdown
@@ -227,8 +275,8 @@ function parseAliExpressData(markdown: string, html: string, metadata: any, orig
 
   for (const pattern of imgPatterns) {
     let match;
-    const content = html || markdown;
-    while ((match = pattern.exec(content)) !== null) {
+    const contentToSearch = html || markdown;
+    while ((match = pattern.exec(contentToSearch)) !== null) {
       const imgUrl = match[1] || match[0];
       if (imgUrl && !imgUrl.includes('avatar') && !imgUrl.includes('icon') && !images.includes(imgUrl)) {
         // Filter out small icons
@@ -268,7 +316,7 @@ function parseAliExpressData(markdown: string, html: string, metadata: any, orig
   
   return {
     title: title || 'Producto de Pesca',
-    subtitle: metadata.description?.substring(0, 100) || '',
+    subtitle: ((metadata.description as string) || '').substring(0, 100),
     price: formattedPrice,
     originalPrice: originalPrice || '',
     priceRange: priceRange || '',
