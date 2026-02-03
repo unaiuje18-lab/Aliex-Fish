@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Upload, X, Loader2, Image as ImageIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { compressImage } from '@/lib/imageCompression';
 
 interface ImageUploadProps {
   value: string;
@@ -28,12 +29,12 @@ export function ImageUpload({ value, onChange }: ImageUploadProps) {
       return;
     }
 
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
+    // Validate file size (max 10MB before compression)
+    if (file.size > 10 * 1024 * 1024) {
       toast({
         variant: 'destructive',
         title: 'Archivo muy grande',
-        description: 'El tamaño máximo es 5MB.',
+        description: 'El tamaño máximo es 10MB.',
       });
       return;
     }
@@ -41,13 +42,27 @@ export function ImageUpload({ value, onChange }: ImageUploadProps) {
     setIsUploading(true);
 
     try {
-      const fileExt = file.name.split('.').pop();
+      // Compress image before upload
+      const compressedFile = await compressImage(file, {
+        maxWidth: 1920,
+        maxHeight: 1920,
+        quality: 0.85,
+        format: 'image/webp',
+      });
+
+      const originalSize = file.size;
+      const compressedSize = compressedFile.size;
+      const wasCompressed = compressedSize < originalSize;
+
+      const fileExt = compressedFile.name.split('.').pop();
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
       const filePath = `products/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('product-images')
-        .upload(filePath, file);
+        .upload(filePath, compressedFile, {
+          contentType: compressedFile.type,
+        });
 
       if (uploadError) throw uploadError;
 
@@ -57,16 +72,26 @@ export function ImageUpload({ value, onChange }: ImageUploadProps) {
 
       onChange(publicUrl);
 
-      toast({
-        title: 'Imagen subida',
-        description: 'La imagen se ha subido correctamente.',
-      });
-    } catch (error: any) {
+      // Show compression stats in toast
+      if (wasCompressed) {
+        const reduction = Math.round((1 - compressedSize / originalSize) * 100);
+        toast({
+          title: 'Imagen optimizada y subida',
+          description: `Compresión: ${(originalSize / 1024).toFixed(0)}KB → ${(compressedSize / 1024).toFixed(0)}KB (-${reduction}%)`,
+        });
+      } else {
+        toast({
+          title: 'Imagen subida',
+          description: 'La imagen se ha subido correctamente.',
+        });
+      }
+    } catch (error: unknown) {
       console.error('Upload error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'No se pudo subir la imagen.';
       toast({
         variant: 'destructive',
         title: 'Error al subir',
-        description: error.message || 'No se pudo subir la imagen.',
+        description: errorMessage,
       });
     } finally {
       setIsUploading(false);
