@@ -155,11 +155,11 @@ const Index = () => {
                       </h3>
                       
                       <div className="flex items-center gap-1 mb-3">
-                        <div className="flex items-center text-yellow-500">
+                        <div className="flex items-center text-warning">
                           {Array.from({ length: 5 }).map((_, i) => (
                             <Star
                               key={i}
-                              className={`h-4 w-4 ${i < Math.floor(product.rating) ? 'fill-current' : ''}`}
+                              className={`h-4 w-4 ${i < Math.floor(product.rating || 0) ? 'fill-current' : ''}`}
                             />
                           ))}
                         </div>
