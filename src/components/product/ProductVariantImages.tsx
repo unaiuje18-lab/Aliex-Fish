@@ -42,10 +42,12 @@ export function ProductVariantImages({
                 : "border-border"
             )}
           >
-            <div className="aspect-square">
+            <div className="aspect-square bg-muted">
               <img
                 src={image.image_url}
                 alt={image.title || 'Variante'}
+                loading="lazy"
+                decoding="async"
                 className="w-full h-full object-cover"
               />
             </div>

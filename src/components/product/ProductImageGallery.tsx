@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -109,10 +109,12 @@ export function ProductImageGallery({
                       {image.title}
                     </span>
                   )}
-                  <div className="aspect-square">
+                  <div className="aspect-square bg-muted">
                     <img
                       src={image.image_url}
                       alt={image.title || `${productTitle} - ${actualIndex + 1}`}
+                      loading="lazy"
+                      decoding="async"
                       className="w-full h-full object-cover"
                     />
                   </div>
@@ -147,11 +149,15 @@ export function ProductImageGallery({
 
       {/* Main Image */}
       <div className="flex-1 flex flex-col gap-2">
-        <div className="relative aspect-square rounded-xl overflow-hidden bg-muted">
+        <div className="relative aspect-square rounded-xl overflow-hidden bg-muted/50">
           <img
             src={selectedImage?.image_url}
             alt={selectedImage?.title || productTitle}
+            loading="eager"
+            decoding="async"
+            fetchPriority="high"
             className="w-full h-full object-contain"
+            style={{ imageRendering: 'auto' }}
           />
         </div>
 
