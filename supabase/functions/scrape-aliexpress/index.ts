@@ -73,11 +73,23 @@ Deno.serve(async (req) => {
       formattedUrl = `https://${formattedUrl}`;
     }
     
-    // Convert regional AliExpress URLs to global version to avoid app download redirect
-    formattedUrl = formattedUrl.replace(/https?:\/\/(es|fr|de|it|pt|ru|ko|ja|ar|he|tr|nl|pl)\./i, 'https://www.');
-    formattedUrl = formattedUrl.replace(/https?:\/\/m\./i, 'https://www.'); // Mobile to desktop
+    // Extract product ID and build a reliable URL
+    const productIdMatch = formattedUrl.match(/item\/(\d+)\.html/);
+    const productId = productIdMatch ? productIdMatch[1] : null;
     
-    console.log('Scraping AliExpress URL:', formattedUrl);
+    // Try different AliExpress domains
+    const urlsToTry = [
+      formattedUrl.replace(/https?:\/\/[^\/]+/, 'https://www.aliexpress.us'),
+      formattedUrl.replace(/https?:\/\/[^\/]+/, 'https://www.aliexpress.com'),
+      formattedUrl,
+    ];
+    
+    if (productId) {
+      // Build canonical URL if we found product ID
+      urlsToTry.unshift(`https://www.aliexpress.us/item/${productId}.html`);
+    }
+    
+    console.log('Will try URLs:', urlsToTry.slice(0, 2));
 
     // Use rawHtml to get unprocessed content including all image sources
     const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
