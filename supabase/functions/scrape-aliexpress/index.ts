@@ -72,7 +72,11 @@ Deno.serve(async (req) => {
     if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
       formattedUrl = `https://${formattedUrl}`;
     }
-
+    
+    // Convert regional AliExpress URLs to global version to avoid app download redirect
+    formattedUrl = formattedUrl.replace(/https?:\/\/(es|fr|de|it|pt|ru|ko|ja|ar|he|tr|nl|pl)\./i, 'https://www.');
+    formattedUrl = formattedUrl.replace(/https?:\/\/m\./i, 'https://www.'); // Mobile to desktop
+    
     console.log('Scraping AliExpress URL:', formattedUrl);
 
     // Use rawHtml to get unprocessed content including all image sources
@@ -86,15 +90,20 @@ Deno.serve(async (req) => {
         url: formattedUrl,
         formats: ['markdown', 'rawHtml', 'links'],
         onlyMainContent: false,
-        waitFor: 12000, // Wait 12 seconds for JavaScript to fully render
-        timeout: 90000, // 90 second timeout
+        waitFor: 15000, // Wait 15 seconds for JavaScript to fully render
+        timeout: 120000, // 120 second timeout
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        },
         actions: [
-          { type: 'wait', milliseconds: 5000 }, // Wait for initial load
-          { type: 'scroll', direction: 'down', amount: 800 },
+          { type: 'wait', milliseconds: 6000 }, // Wait for initial load
+          { type: 'click', selector: 'body' }, // Click to dismiss any popups
+          { type: 'wait', milliseconds: 1000 },
+          { type: 'scroll', direction: 'down', amount: 1000 },
           { type: 'wait', milliseconds: 2000 },
-          { type: 'scroll', direction: 'down', amount: 800 },
-          { type: 'wait', milliseconds: 2000 },
-          { type: 'scroll', direction: 'down', amount: 800 },
+          { type: 'scroll', direction: 'down', amount: 1000 },
           { type: 'wait', milliseconds: 2000 },
           { type: 'scroll', direction: 'up', amount: 2000 }, // Scroll back up
           { type: 'wait', milliseconds: 3000 }, // Final wait for images
