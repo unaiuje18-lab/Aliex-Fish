@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
 
     console.log('Scraping AliExpress URL:', formattedUrl);
 
-    // Use screenshot format to force full page render, plus markdown for text content
+    // Use rawHtml to get unprocessed content including all image sources
     const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
       method: 'POST',
       headers: {
@@ -84,14 +84,20 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         url: formattedUrl,
-        formats: ['markdown', 'html', 'links'],
+        formats: ['markdown', 'rawHtml', 'links'],
         onlyMainContent: false,
-        waitFor: 8000, // Wait 8 seconds for JavaScript to fully render
-        timeout: 60000, // 60 second timeout
+        waitFor: 12000, // Wait 12 seconds for JavaScript to fully render
+        timeout: 90000, // 90 second timeout
         actions: [
-          { type: 'wait', milliseconds: 3000 }, // Wait for initial load
-          { type: 'scroll', direction: 'down', amount: 500 }, // Scroll to trigger lazy loading
-          { type: 'wait', milliseconds: 2000 }, // Wait for images to load
+          { type: 'wait', milliseconds: 5000 }, // Wait for initial load
+          { type: 'scroll', direction: 'down', amount: 800 },
+          { type: 'wait', milliseconds: 2000 },
+          { type: 'scroll', direction: 'down', amount: 800 },
+          { type: 'wait', milliseconds: 2000 },
+          { type: 'scroll', direction: 'down', amount: 800 },
+          { type: 'wait', milliseconds: 2000 },
+          { type: 'scroll', direction: 'up', amount: 2000 }, // Scroll back up
+          { type: 'wait', milliseconds: 3000 }, // Final wait for images
         ],
       }),
     });
