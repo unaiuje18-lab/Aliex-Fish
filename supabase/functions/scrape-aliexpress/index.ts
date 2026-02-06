@@ -72,10 +72,26 @@ Deno.serve(async (req) => {
     if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
       formattedUrl = `https://${formattedUrl}`;
     }
+    
+    // Extract product ID and build a reliable URL
+    const productIdMatch = formattedUrl.match(/item\/(\d+)\.html/);
+    const productId = productIdMatch ? productIdMatch[1] : null;
+    
+    // Try different AliExpress domains
+    const urlsToTry = [
+      formattedUrl.replace(/https?:\/\/[^\/]+/, 'https://www.aliexpress.us'),
+      formattedUrl.replace(/https?:\/\/[^\/]+/, 'https://www.aliexpress.com'),
+      formattedUrl,
+    ];
+    
+    if (productId) {
+      // Build canonical URL if we found product ID
+      urlsToTry.unshift(`https://www.aliexpress.us/item/${productId}.html`);
+    }
+    
+    console.log('Will try URLs:', urlsToTry.slice(0, 2));
 
-    console.log('Scraping AliExpress URL:', formattedUrl);
-
-    // Use screenshot format to force full page render, plus markdown for text content
+    // Use rawHtml to get unprocessed content including all image sources
     const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
       method: 'POST',
       headers: {
@@ -84,14 +100,25 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         url: formattedUrl,
-        formats: ['markdown', 'html', 'links'],
+        formats: ['markdown', 'rawHtml', 'links'],
         onlyMainContent: false,
-        waitFor: 8000, // Wait 8 seconds for JavaScript to fully render
-        timeout: 60000, // 60 second timeout
+        waitFor: 15000, // Wait 15 seconds for JavaScript to fully render
+        timeout: 120000, // 120 second timeout
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        },
         actions: [
-          { type: 'wait', milliseconds: 3000 }, // Wait for initial load
-          { type: 'scroll', direction: 'down', amount: 500 }, // Scroll to trigger lazy loading
-          { type: 'wait', milliseconds: 2000 }, // Wait for images to load
+          { type: 'wait', milliseconds: 6000 }, // Wait for initial load
+          { type: 'click', selector: 'body' }, // Click to dismiss any popups
+          { type: 'wait', milliseconds: 1000 },
+          { type: 'scroll', direction: 'down', amount: 1000 },
+          { type: 'wait', milliseconds: 2000 },
+          { type: 'scroll', direction: 'down', amount: 1000 },
+          { type: 'wait', milliseconds: 2000 },
+          { type: 'scroll', direction: 'up', amount: 2000 }, // Scroll back up
+          { type: 'wait', milliseconds: 3000 }, // Final wait for images
         ],
       }),
     });
@@ -107,13 +134,18 @@ Deno.serve(async (req) => {
     }
 
     const markdown = data.data?.markdown || data.markdown || '';
-    const html = data.data?.html || data.html || '';
+    const html = data.data?.rawHtml || data.data?.html || data.rawHtml || data.html || '';
     const links = data.data?.links || data.links || [];
     const metadata = data.data?.metadata || data.metadata || {};
 
     console.log('Markdown length:', markdown.length);
-    console.log('HTML length:', html.length);
+    console.log('Raw HTML length:', html.length);
     console.log('Links count:', links.length);
+    
+    // Log a sample of the HTML to debug what we're receiving
+    if (html.length > 0) {
+      console.log('HTML sample (first 500 chars):', html.substring(0, 500));
+    }
 
     const productData = parseAliExpressData(markdown, html, links, metadata, formattedUrl);
 
@@ -271,62 +303,69 @@ function extractAllImages(
   const images = new Set<string>();
   const contentToSearch = html + ' ' + markdown;
   
-  // ========== METHOD 1: Extract from HTML attributes ==========
+  console.log('Searching for images in content of length:', contentToSearch.length);
+  
+  // ========== METHOD 1: Extract ALL alicdn URLs (most aggressive) ==========
+  // This catches images even when they don't have visible extensions
+  const alicdnPattern = /https?:\/\/[a-z0-9.-]*alicdn\.com\/[^\s"'<>\\)]+/gi;
+  let match;
+  alicdnPattern.lastIndex = 0;
+  while ((match = alicdnPattern.exec(contentToSearch)) !== null) {
+    let url = match[0];
+    // Clean up URL - remove trailing punctuation
+    url = url.replace(/[,;}\]]+$/, '');
+    // Check if it looks like an image path
+    if (url.includes('/kf/') || url.includes('/imgextra/') || /\.(jpg|jpeg|png|webp)/i.test(url)) {
+      if (isValidProductImage(url)) {
+        images.add(upgradeToMaxResolution(url));
+      }
+    }
+  }
+  console.log(`After alicdn pattern: ${images.size} images`);
+  
+  // ========== METHOD 2: Extract from HTML attributes ==========
   const srcPatterns = [
-    /src=["']([^"']+\.(?:jpg|jpeg|png|webp)[^"']*)["']/gi,
-    /data-src=["']([^"']+\.(?:jpg|jpeg|png|webp)[^"']*)["']/gi,
-    /data-lazy-src=["']([^"']+\.(?:jpg|jpeg|png|webp)[^"']*)["']/gi,
+    /src=["']([^"']+)["']/gi,
+    /data-src=["']([^"']+)["']/gi,
+    /data-lazy-src=["']([^"']+)["']/gi,
     /data-magnifier-src=["']([^"']+)["']/gi,
     /data-zoom-src=["']([^"']+)["']/gi,
   ];
 
   for (const pattern of srcPatterns) {
-    let match;
     pattern.lastIndex = 0;
     while ((match = pattern.exec(contentToSearch)) !== null) {
       const url = match[1];
+      if (url.includes('alicdn.com') && isValidProductImage(url)) {
+        images.add(upgradeToMaxResolution(url));
+      }
+    }
+  }
+  console.log(`After src patterns: ${images.size} images`);
+  
+  // ========== METHOD 3: Extract from escaped JSON (\\u002F = /) ==========
+  // AliExpress often uses escaped URLs in JavaScript
+  const unescapedContent = contentToSearch
+    .replace(/\\u002F/gi, '/')
+    .replace(/\\u003A/gi, ':')
+    .replace(/\\\//g, '/');
+  
+  alicdnPattern.lastIndex = 0;
+  while ((match = alicdnPattern.exec(unescapedContent)) !== null) {
+    let url = match[0];
+    url = url.replace(/[,;}\]]+$/, '');
+    if (url.includes('/kf/') || url.includes('/imgextra/') || /\.(jpg|jpeg|png|webp)/i.test(url)) {
       if (isValidProductImage(url)) {
         images.add(upgradeToMaxResolution(url));
       }
     }
   }
+  console.log(`After unescaped JSON: ${images.size} images`);
   
-  // ========== METHOD 2: Extract from markdown image syntax ==========
-  const markdownImagePattern = /!\[[^\]]*\]\(([^)]+)\)/g;
-  let match;
-  while ((match = markdownImagePattern.exec(markdown)) !== null) {
-    const url = match[1];
-    if (isValidProductImage(url)) {
-      images.add(upgradeToMaxResolution(url));
-    }
-  }
-  
-  // ========== METHOD 3: Extract from links array ==========
+  // ========== METHOD 4: Extract from links array ==========
   for (const link of links) {
-    if (isValidProductImage(link)) {
+    if (link.includes('alicdn.com') && isValidProductImage(link)) {
       images.add(upgradeToMaxResolution(link));
-    }
-  }
-  
-  // ========== METHOD 4: Direct AliExpress CDN URL patterns ==========
-  const aliexpressPatterns = [
-    // Main product images on ae01-ae09
-    /https?:\/\/ae0[1-9]\.alicdn\.com\/kf\/[A-Za-z0-9_-]+\.(?:jpg|jpeg|png|webp)/gi,
-    // cbu CDN for variants
-    /https?:\/\/cbu0[1-9]\.alicdn\.com\/[^\s"'<>]+\.(?:jpg|jpeg|png|webp)/gi,
-    // img.alicdn.com
-    /https?:\/\/img\.alicdn\.com\/[^\s"'<>]+\.(?:jpg|jpeg|png|webp)/gi,
-    // Any alicdn image
-    /https?:\/\/[a-z0-9.-]*alicdn\.com\/[^\s"'<>]+\.(?:jpg|jpeg|png|webp)/gi,
-  ];
-
-  for (const pattern of aliexpressPatterns) {
-    pattern.lastIndex = 0;
-    while ((match = pattern.exec(contentToSearch)) !== null) {
-      const url = match[0];
-      if (isValidProductImage(url)) {
-        images.add(upgradeToMaxResolution(url));
-      }
     }
   }
   
@@ -338,9 +377,22 @@ function extractAllImages(
     }
   }
   
-  // ========== METHOD 6: Extract from JSON-LD or data attributes ==========
+  // Also check other metadata fields
+  const metaStr = JSON.stringify(metadata);
+  alicdnPattern.lastIndex = 0;
+  while ((match = alicdnPattern.exec(metaStr)) !== null) {
+    let url = match[0];
+    url = url.replace(/[,;}\]"]+$/, '');
+    if (isValidProductImage(url)) {
+      images.add(upgradeToMaxResolution(url));
+    }
+  }
+  
+  // ========== METHOD 6: Extract from JSON patterns ==========
   const jsonPatterns = [
+    /"imageUrl"\s*:\s*"([^"]+)"/gi,
     /"image"\s*:\s*"([^"]+)"/gi,
+    /"imagePathList"\s*:\s*\[([^\]]+)\]/gi,
     /"images"\s*:\s*\[([^\]]+)\]/gi,
     /imageUrl['"]\s*:\s*['"]([^'"]+)['"]/gi,
   ];
@@ -348,14 +400,25 @@ function extractAllImages(
   for (const pattern of jsonPatterns) {
     pattern.lastIndex = 0;
     while ((match = pattern.exec(contentToSearch)) !== null) {
-      const urls = match[1].match(/https?:\/\/[^\s"',]+\.(?:jpg|jpeg|png|webp)/gi);
+      const urls = match[1].match(/https?:\/\/[^\s"',\\]+/gi);
       if (urls) {
-        for (const url of urls) {
-          if (isValidProductImage(url)) {
+        for (let url of urls) {
+          url = url.replace(/\\u002F/gi, '/').replace(/\\\//g, '/');
+          if (url.includes('alicdn.com') && isValidProductImage(url)) {
             images.add(upgradeToMaxResolution(url));
           }
         }
       }
+    }
+  }
+  console.log(`After JSON patterns: ${images.size} images`);
+
+  // ========== METHOD 7: Extract from markdown image syntax ==========
+  const markdownImagePattern = /!\[[^\]]*\]\(([^)]+)\)/g;
+  while ((match = markdownImagePattern.exec(markdown)) !== null) {
+    const url = match[1];
+    if (url.includes('alicdn.com') && isValidProductImage(url)) {
+      images.add(upgradeToMaxResolution(url));
     }
   }
 
