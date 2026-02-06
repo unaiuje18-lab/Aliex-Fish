@@ -113,13 +113,18 @@ Deno.serve(async (req) => {
     }
 
     const markdown = data.data?.markdown || data.markdown || '';
-    const html = data.data?.html || data.html || '';
+    const html = data.data?.rawHtml || data.data?.html || data.rawHtml || data.html || '';
     const links = data.data?.links || data.links || [];
     const metadata = data.data?.metadata || data.metadata || {};
 
     console.log('Markdown length:', markdown.length);
-    console.log('HTML length:', html.length);
+    console.log('Raw HTML length:', html.length);
     console.log('Links count:', links.length);
+    
+    // Log a sample of the HTML to debug what we're receiving
+    if (html.length > 0) {
+      console.log('HTML sample (first 500 chars):', html.substring(0, 500));
+    }
 
     const productData = parseAliExpressData(markdown, html, links, metadata, formattedUrl);
 
