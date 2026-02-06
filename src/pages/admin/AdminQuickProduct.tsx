@@ -6,13 +6,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { useCreateProduct, useUpdateProductBenefits, useUpdateProductReviews } from '@/hooks/useProducts';
+import { useCreateProduct, useUpdateProductBenefits, useUpdateProductReviews, useUpdateProductImages } from '@/hooks/useProducts';
 import { useCategories } from '@/hooks/useCategories';
-import { ArrowLeft, Loader2, Zap, Link as LinkIcon, Check, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Loader2, Zap, Link as LinkIcon, Check, AlertCircle, ImageIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ImageSelector } from '@/components/admin/ImageSelector';
 
 // Default benefits based on category slug
 const DEFAULT_BENEFITS: Record<string, { icon: string; title: string; description: string }[]> = {
@@ -97,6 +99,7 @@ export default function AdminQuickProduct() {
   const createProduct = useCreateProduct();
   const updateBenefits = useUpdateProductBenefits();
   const updateReviews = useUpdateProductReviews();
+  const updateImages = useUpdateProductImages();
 
   // Categories from database
   const { data: categories } = useCategories();
@@ -107,6 +110,10 @@ export default function AdminQuickProduct() {
   const [isScraping, setIsScraping] = useState(false);
   const [scrapedData, setScrapedData] = useState<ScrapedData | null>(null);
   const [error, setError] = useState('');
+  
+  // Image selection state
+  const [showImageSelector, setShowImageSelector] = useState(false);
+  const [selectedImages, setSelectedImages] = useState<string[]>([]);
 
   const handleScrape = async () => {
     if (!aliexpressUrl.trim()) {
@@ -121,6 +128,7 @@ export default function AdminQuickProduct() {
     setIsScraping(true);
     setError('');
     setScrapedData(null);
+    setSelectedImages([]);
 
     try {
       const { data, error: fnError } = await supabase.functions.invoke('scrape-aliexpress', {
@@ -136,9 +144,18 @@ export default function AdminQuickProduct() {
       }
 
       setScrapedData(data.data);
+      
+      // If there are multiple images, show selector
+      if (data.data.images && data.data.images.length > 1) {
+        setSelectedImages(data.data.images);
+        setShowImageSelector(true);
+      } else {
+        setSelectedImages(data.data.images || []);
+      }
+      
       toast({
         title: '¡Datos extraídos!',
-        description: 'Revisa la información y haz clic en Crear Producto',
+        description: `Se encontraron ${data.data.images?.length || 0} imágenes`,
       });
     } catch (err: any) {
       console.error('Scrape error:', err);
@@ -153,12 +170,30 @@ export default function AdminQuickProduct() {
     }
   };
 
+  const handleImageSelection = (images: string[]) => {
+    setSelectedImages(images);
+    setShowImageSelector(false);
+    toast({
+      title: 'Imágenes seleccionadas',
+      description: `${images.length} imágenes listas para importar`,
+    });
+  };
+
   const handleCreateProduct = async () => {
     if (!scrapedData) {
       toast({
         variant: 'destructive',
         title: 'Sin datos',
         description: 'Primero extrae los datos del link de AliExpress',
+      });
+      return;
+    }
+
+    if (selectedImages.length === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'Sin imágenes',
+        description: 'Selecciona al menos una imagen para el producto',
       });
       return;
     }
@@ -176,7 +211,7 @@ export default function AdminQuickProduct() {
         discount: scrapedData.discount || null,
         affiliate_link: scrapedData.affiliateLink,
         aliexpress_url: scrapedData.aliexpressUrl || null,
-        main_image_url: scrapedData.images[0] || null,
+        main_image_url: selectedImages[0] || null,
         video_url: null,
         rating: scrapedData.rating,
         review_count: scrapedData.reviewCount,
@@ -187,6 +222,12 @@ export default function AdminQuickProduct() {
       const newProduct = await createProduct.mutateAsync(productData);
 
       if (newProduct?.id) {
+        // Save all selected images
+        await updateImages.mutateAsync({
+          productId: newProduct.id,
+          images: selectedImages.map(url => ({ url, title: '', price: '' })),
+        });
+        
         // Add default benefits based on category
         const benefitsData = DEFAULT_BENEFITS[category] || DEFAULT_BENEFITS.default;
         await updateBenefits.mutateAsync({
@@ -204,7 +245,7 @@ export default function AdminQuickProduct() {
 
       toast({
         title: '¡Producto creado!',
-        description: 'El producto se ha creado como borrador. Edítalo para publicarlo.',
+        description: `Con ${selectedImages.length} imágenes. Edítalo para publicarlo.`,
       });
 
       navigate(`/admin/productos/${newProduct?.id}`);
@@ -325,9 +366,9 @@ export default function AdminQuickProduct() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex gap-4">
-                {scrapedData.images[0] && (
+                {selectedImages[0] && (
                   <img
-                    src={scrapedData.images[0]}
+                    src={selectedImages[0]}
                     alt="Producto"
                     className="w-24 h-24 object-cover rounded-lg border"
                     onError={(e) => {
@@ -362,6 +403,30 @@ export default function AdminQuickProduct() {
                 </div>
               </div>
 
+              {/* Image count and selector button */}
+              <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">
+                    <strong>{selectedImages.length}</strong> imágenes seleccionadas
+                    {scrapedData.images.length > selectedImages.length && (
+                      <span className="text-muted-foreground">
+                        {' '}de {scrapedData.images.length} disponibles
+                      </span>
+                    )}
+                  </span>
+                </div>
+                {scrapedData.images.length > 0 && (
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setShowImageSelector(true)}
+                  >
+                    Editar selección
+                  </Button>
+                )}
+              </div>
+
               <div className="pt-4 border-t">
                 <Label className="text-xs text-muted-foreground mb-2 block">
                   Se añadirán automáticamente:
@@ -383,14 +448,14 @@ export default function AdminQuickProduct() {
                 onClick={handleCreateProduct} 
                 className="w-full" 
                 size="lg"
-                disabled={isLoading}
+                disabled={isLoading || selectedImages.length === 0}
               >
                 {isLoading ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 ) : (
                   <Check className="h-4 w-4 mr-2" />
                 )}
-                Crear Producto
+                Crear Producto con {selectedImages.length} imágenes
               </Button>
 
               <p className="text-xs text-center text-muted-foreground">
@@ -400,6 +465,26 @@ export default function AdminQuickProduct() {
           </Card>
         )}
       </div>
+
+      {/* Image Selection Dialog */}
+      <Dialog open={showImageSelector} onOpenChange={setShowImageSelector}>
+        <DialogContent className="max-w-3xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>Seleccionar imágenes a importar</DialogTitle>
+            <DialogDescription>
+              Elige qué imágenes quieres usar para este producto. La primera será la imagen principal.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {scrapedData && (
+            <ImageSelector
+              images={scrapedData.images}
+              onConfirm={handleImageSelection}
+              onCancel={() => setShowImageSelector(false)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 }
