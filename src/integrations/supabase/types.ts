@@ -409,6 +409,33 @@ export type Database = {
         }
         Relationships: []
       }
+      site_social_links: {
+        Row: {
+          created_at: string
+          display_order: number
+          id: string
+          is_enabled: boolean
+          platform: string
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_enabled?: boolean
+          platform: string
+          url: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_enabled?: boolean
+          platform?: string
+          url?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string

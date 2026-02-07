@@ -6,8 +6,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Star, ShoppingCart, Settings } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useSiteSettings } from '@/hooks/useSiteSettings';
 
+import { useSiteSettings } from '@/hooks/useSiteSettings';
+import { useSiteSocialLinks } from '@/hooks/useSiteSocialLinks';
+import { SocialIcon } from '@/components/social/SocialIcon';
 const Index = () => {
   const [searchParams] = useSearchParams();
   const selectedCategory = searchParams.get('categoria');
@@ -16,6 +18,7 @@ const Index = () => {
   const { data: categories, isLoading: categoriesLoading } = useCategories();
   const { isAdmin, user } = useAuth();
   const { data: siteSettings } = useSiteSettings();
+  const { data: socialLinks } = useSiteSocialLinks();
 
   // Filter products by selected category
   const filteredProducts = selectedCategory
@@ -28,6 +31,7 @@ const Index = () => {
   const heroTitle = siteSettings?.hero_title || 'Los mejores productos de pesca de todo AliExpress';
   const heroSubtitle = siteSettings?.hero_subtitle || 'Encuentra los mejores precios en artículos de pesca directamente desde AliExpress. ¡Equípate como un profesional sin gastar de más!';
   const footerText = siteSettings?.footer_text || `© ${new Date().getFullYear()} MiTienda. Todos los derechos reservados.`;
+  const enabledSocials = (socialLinks || []).filter((s) => s.is_enabled && s.url);
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-background to-muted/30">
@@ -207,7 +211,23 @@ const Index = () => {
 
       {/* Footer */}
       <footer className="border-t py-8 text-center text-sm text-muted-foreground">
-        <div className="container max-w-6xl mx-auto px-4">
+        <div className="container max-w-6xl mx-auto px-4 space-y-4">
+          {enabledSocials.length > 0 && (
+            <div className="flex items-center justify-center gap-4">
+              {enabledSocials.map((social) => (
+                <a
+                  key={`${social.platform}-${social.url}`}
+                  href={social.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label={social.platform}
+                >
+                  <SocialIcon platform={social.platform} className="w-5 h-5" />
+                </a>
+              ))}
+            </div>
+          )}
           <p>{footerText}</p>
         </div>
       </footer>
@@ -216,6 +236,13 @@ const Index = () => {
 };
 
 export default Index;
+
+
+
+
+
+
+
 
 
 

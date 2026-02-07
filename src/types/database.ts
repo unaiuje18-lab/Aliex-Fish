@@ -110,3 +110,12 @@ export interface SiteSettings {
   footer_text: string;
   updated_at: string;
 }
+
+export interface SiteSocialLink {
+  id: string;
+  platform: string;
+  url: string;
+  is_enabled: boolean;
+  display_order: number;
+  created_at: string;
+}
