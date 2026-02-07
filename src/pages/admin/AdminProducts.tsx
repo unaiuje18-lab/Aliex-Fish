@@ -113,14 +113,7 @@ export default function AdminProducts() {
               Gestiona todos tus productos
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button asChild>
-              <Link to="/admin/productos/nuevo">
-                <Plus className="h-4 w-4 mr-2" />
-                Crear
-              </Link>
-            </Button>
-          </div>
+          <div className="flex gap-2" />
         </div>
 
         {/* Filters */}
