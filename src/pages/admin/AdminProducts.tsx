@@ -31,9 +31,7 @@ import {
   Trash2, 
   ExternalLink,
   Package,
-  Loader2,
-  Zap
-} from 'lucide-react';
+  Loader2,\n} from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 
@@ -116,12 +114,6 @@ export default function AdminProducts() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button asChild variant="outline">
-              <Link to="/admin/productos/rapido">
-                <Zap className="h-4 w-4 mr-2" />
-                Rápido
-              </Link>
-            </Button>
             <Button asChild>
               <Link to="/admin/productos/nuevo">
                 <Plus className="h-4 w-4 mr-2" />
@@ -305,3 +297,10 @@ export default function AdminProducts() {
     </AdminLayout>
   );
 }
+
+
+
+
+
+
+
