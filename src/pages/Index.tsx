@@ -25,7 +25,7 @@ const Index = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
-  const [searchResults, setSearchResults] = useState<typeof products>([]);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
   // Filter products by selected category
@@ -59,7 +59,7 @@ const Index = () => {
 
     const timeout = window.setTimeout(async () => {
       setIsSearching(true);
-      const { data, error } = await supabase.rpc('search_products', {
+      const { data, error } = await (supabase as any).rpc('search_products', {
         q: searchQuery.trim(),
         category: selectedCategory || null,
         min_price: parseNumeric(minPrice),
@@ -77,7 +77,7 @@ const Index = () => {
   }, [searchQuery, minPrice, maxPrice, selectedCategory, shouldSearch]);
 
   useEffect(() => {
-    supabase.from('analytics_events').insert({
+    (supabase as any).from('analytics_events').insert({
       event_type: 'page_view',
       path: '/',
     });

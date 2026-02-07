@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      analytics_events: {
+        Row: {
+          created_at: string
+          event_type: string
+          id: string
+          path: string | null
+          product_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_type: string
+          id?: string
+          path?: string | null
+          product_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          id?: string
+          path?: string | null
+          product_id?: string | null
+        }
+        Relationships: []
+      }
       categories: {
         Row: {
           created_at: string
@@ -329,9 +353,10 @@ export type Database = {
           price_min: number | null
           rating: number | null
           review_count: number | null
+          search_tsv: unknown
           shipping_cost: string | null
-          slug: string
           sku: string | null
+          slug: string
           subtitle: string | null
           title: string
           updated_at: string
@@ -355,9 +380,10 @@ export type Database = {
           price_min?: number | null
           rating?: number | null
           review_count?: number | null
+          search_tsv?: unknown
           shipping_cost?: string | null
-          slug: string
           sku?: string | null
+          slug: string
           subtitle?: string | null
           title: string
           updated_at?: string
@@ -381,9 +407,10 @@ export type Database = {
           price_min?: number | null
           rating?: number | null
           review_count?: number | null
+          search_tsv?: unknown
           shipping_cost?: string | null
-          slug?: string
           sku?: string | null
+          slug?: string
           subtitle?: string | null
           title?: string
           updated_at?: string
@@ -400,9 +427,9 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          footer_text: string
-          hero_subtitle: string
-          hero_title: string
+          footer_text?: string
+          hero_subtitle?: string
+          hero_title?: string
           id?: number
           updated_at?: string
         }
@@ -442,30 +469,6 @@ export type Database = {
         }
         Relationships: []
       }
-      analytics_events: {
-        Row: {
-          created_at: string
-          event_type: string
-          id: string
-          path: string | null
-          product_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          event_type: string
-          id?: string
-          path?: string | null
-          product_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          event_type?: string
-          id?: string
-          path?: string | null
-          product_id?: string | null
-        }
-        Relationships: []
-      }
       user_roles: {
         Row: {
           created_at: string
@@ -499,6 +502,38 @@ export type Database = {
         }
         Returns: boolean
       }
+      search_products: {
+        Args: {
+          category?: string
+          limit_count?: number
+          max_price?: number
+          min_price?: number
+          q: string
+        }
+        Returns: {
+          affiliate_link: string
+          aliexpress_url: string
+          category: string
+          created_at: string
+          discount: string
+          id: string
+          is_published: boolean
+          main_image_url: string
+          original_price: string
+          price: string
+          rank_score: number
+          rating: number
+          review_count: number
+          slug: string
+          subtitle: string
+          title: string
+          updated_at: string
+          video_url: string
+        }[]
+      }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
+      unaccent: { Args: { "": string }; Returns: string }
     }
     Enums: {
       app_role: "admin" | "user"
