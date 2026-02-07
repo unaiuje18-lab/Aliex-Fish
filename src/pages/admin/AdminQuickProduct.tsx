@@ -144,9 +144,33 @@ export default function AdminQuickProduct() {
     setSelectedImages([]);
 
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('import-product', {
-        body: { url: targetUrl },
-      });
+      let data: any;
+      let fnError: any;
+
+      try {
+        const res = await supabase.functions.invoke('import-product', {
+          body: { url: targetUrl },
+        });
+        data = res.data;
+        fnError = res.error;
+      } catch (err: any) {
+        fnError = err;
+      }
+
+      if (fnError && String(fnError.message || fnError).includes('Failed to send a request')) {
+        // Fallback to legacy scraper if new function isn't reachable
+        const fallback = await supabase.functions.invoke('scrape-aliexpress', {
+          body: { url: targetUrl },
+        });
+        data = fallback.data;
+        fnError = fallback.error;
+        if (!fnError) {
+          toast({
+            title: 'Usando modo compatible',
+            description: 'No se pudo contactar import-product. Despliega la función para el modo completo.',
+          });
+        }
+      }
 
       if (fnError) {
         throw new Error(fnError.message);
