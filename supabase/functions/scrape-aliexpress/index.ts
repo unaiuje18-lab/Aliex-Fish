@@ -137,49 +137,60 @@ Deno.serve(async (req) => {
     console.log('Final scrape URL:', scrapeUrl, '| Product ID:', productId);
 
     // ===== STEP 3: Scrape with Firecrawl =====
-    const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        url: scrapeUrl,
-        formats: ['markdown', 'rawHtml', 'links'],
-        onlyMainContent: false,
-        waitFor: 10000,
-        timeout: 90000,
+    const scrapeWithFirecrawl = async (targetUrl: string) => {
+      const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
+        method: 'POST',
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept-Language': 'en-US,en;q=0.9,es;q=0.8',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
         },
-        actions: [
-          { type: 'wait', milliseconds: 5000 },
-          { type: 'click', selector: 'body' },
-          { type: 'wait', milliseconds: 1000 },
-          { type: 'scroll', direction: 'down', amount: 2000 },
-          { type: 'wait', milliseconds: 3000 },
-          { type: 'scroll', direction: 'up', amount: 2000 },
-          { type: 'wait', milliseconds: 2000 },
-        ],
-      }),
-    });
+        body: JSON.stringify({
+          url: targetUrl,
+          formats: ['markdown', 'rawHtml', 'links'],
+          onlyMainContent: false,
+          waitFor: 10000,
+          timeout: 90000,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept-Language': 'en-US,en;q=0.9,es;q=0.8',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+          },
+          actions: [
+            { type: 'wait', milliseconds: 5000 },
+            { type: 'click', selector: 'body' },
+            { type: 'wait', milliseconds: 1000 },
+            { type: 'scroll', direction: 'down', amount: 2000 },
+            { type: 'wait', milliseconds: 3000 },
+            { type: 'scroll', direction: 'up', amount: 2000 },
+            { type: 'wait', milliseconds: 2000 },
+          ],
+        }),
+      });
 
-    const data = await response.json();
+      const data = await response.json();
 
-    if (!response.ok) {
-      console.error('Firecrawl API error:', data);
+      if (!response.ok) {
+        console.error('Firecrawl API error:', data);
+        return { ok: false, error: data.error || 'Failed to scrape', status: response.status };
+      }
+
+      const markdown = data.data?.markdown || data.markdown || '';
+      const html = data.data?.rawHtml || data.data?.html || data.rawHtml || data.html || '';
+      const links = data.data?.links || data.links || [];
+      const metadata = data.data?.metadata || data.metadata || {};
+
+      return { ok: true, markdown, html, links, metadata };
+    };
+
+    const first = await scrapeWithFirecrawl(scrapeUrl);
+    if (!first.ok) {
       return new Response(
-        JSON.stringify({ success: false, error: data.error || 'Failed to scrape' }),
-        { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ success: false, error: first.error }),
+        { status: first.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const markdown = data.data?.markdown || data.markdown || '';
-    const html = data.data?.rawHtml || data.data?.html || data.rawHtml || data.html || '';
-    const links = data.data?.links || data.links || [];
-    const metadata = data.data?.metadata || data.metadata || {};
+    let { markdown, html, links, metadata } = first;
 
     console.log('Markdown length:', markdown.length);
     console.log('Raw HTML length:', html.length);
@@ -190,7 +201,19 @@ Deno.serve(async (req) => {
       console.log('HTML sample (first 500 chars):', html.substring(0, 500));
     }
 
-    const productData = parseAliExpressData(markdown, html, links, metadata, formattedUrl);
+    let productData = parseAliExpressData(markdown, html, links, metadata, formattedUrl);
+
+    // If scrape looks weak, try to find a canonical product URL and rescrape once
+    if ((!productData.title || productData.images.length === 0) && links.length > 0) {
+      const canonicalUrl = extractCanonicalProductUrl(html, links);
+      if (canonicalUrl && canonicalUrl !== scrapeUrl) {
+        console.log('Retrying with canonical URL:', canonicalUrl);
+        const second = await scrapeWithFirecrawl(canonicalUrl);
+        if (second.ok) {
+          productData = parseAliExpressData(second.markdown, second.html, second.links, second.metadata, canonicalUrl);
+        }
+      }
+    }
 
     console.log(`Extracted ${productData.images.length} images`);
 
@@ -467,6 +490,28 @@ function extractAllImages(
 
   console.log(`Found ${images.size} unique product images`);
   return Array.from(images);
+}
+
+function extractCanonicalProductUrl(html: string, links: string[]): string | null {
+  const candidates: string[] = [];
+
+  for (const link of links) {
+    if (/aliexpress\.com\/item\/\d+\.html/i.test(link)) {
+      candidates.push(link);
+    }
+  }
+
+  const htmlMatch = html.match(/https?:\/\/[a-z0-9.-]*aliexpress\.com\/item\/\d+\.html/gi);
+  if (htmlMatch) {
+    candidates.push(...htmlMatch);
+  }
+
+  if (candidates.length === 0) return null;
+
+  const unique = Array.from(new Set(candidates));
+  const preferred = unique.find(u => u.includes('www.aliexpress.com')) || unique[0];
+
+  return preferred;
 }
 
 function isValidProductImage(url: string): boolean {
