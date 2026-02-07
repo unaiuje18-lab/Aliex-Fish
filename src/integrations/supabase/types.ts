@@ -325,6 +325,8 @@ export type Database = {
           orders_count: number | null
           original_price: string | null
           price: string
+          price_max: number | null
+          price_min: number | null
           rating: number | null
           review_count: number | null
           shipping_cost: string | null
@@ -349,6 +351,8 @@ export type Database = {
           orders_count?: number | null
           original_price?: string | null
           price: string
+          price_max?: number | null
+          price_min?: number | null
           rating?: number | null
           review_count?: number | null
           shipping_cost?: string | null
@@ -373,6 +377,8 @@ export type Database = {
           orders_count?: number | null
           original_price?: string | null
           price?: string
+          price_max?: number | null
+          price_min?: number | null
           rating?: number | null
           review_count?: number | null
           shipping_cost?: string | null

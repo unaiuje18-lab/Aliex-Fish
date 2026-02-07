@@ -262,12 +262,17 @@ export default function AdminProductForm() {
     try {
       let productId = id;
 
+      const priceMin = parsePriceNumber(priceFrom);
+      const priceMax = priceMode === 'range' ? parsePriceNumber(priceTo) : parsePriceNumber(priceFrom);
+
       const productData = {
         title,
         slug,
         subtitle: subtitle || null,
         description: description || null,
         price: finalPrice,
+        price_min: priceMin,
+        price_max: priceMax,
         original_price: originalPrice || null,
         discount: discount || null,
         affiliate_link: affiliateLink,
@@ -995,5 +1000,6 @@ export default function AdminProductForm() {
     </AdminLayout>
   );
 }
+
 
 

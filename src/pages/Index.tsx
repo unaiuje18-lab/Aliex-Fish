@@ -1,8 +1,9 @@
 import { Link, useSearchParams } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { usePublishedProducts } from '@/hooks/useProducts';
 import { useCategories } from '@/hooks/useCategories';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Star, ShoppingCart, Settings } from 'lucide-react';
@@ -21,6 +22,11 @@ const Index = () => {
   const { isAdmin, user } = useAuth();
   const { data: siteSettings } = useSiteSettings();
   const { data: socialLinks } = useSiteSocialLinks();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
+  const [searchResults, setSearchResults] = useState<typeof products>([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   // Filter products by selected category
   const filteredProducts = selectedCategory
@@ -35,12 +41,49 @@ const Index = () => {
   const footerText = siteSettings?.footer_text || `© ${new Date().getFullYear()} MiTienda. Todos los derechos reservados.`;
   const enabledSocials = (socialLinks || []).filter((s) => s.is_enabled && s.url);
 
+  const shouldSearch = useMemo(() => {
+    return Boolean(searchQuery.trim() || minPrice.trim() || maxPrice.trim() || selectedCategory);
+  }, [searchQuery, minPrice, maxPrice, selectedCategory]);
+
+  const parseNumeric = (value: string) => {
+    const cleaned = value.replace(/[^\d.,]/g, '').replace(',', '.');
+    const num = parseFloat(cleaned);
+    return Number.isNaN(num) ? null : num;
+  };
+
+  useEffect(() => {
+    if (!shouldSearch) {
+      setSearchResults([]);
+      return;
+    }
+
+    const timeout = window.setTimeout(async () => {
+      setIsSearching(true);
+      const { data, error } = await supabase.rpc('search_products', {
+        q: searchQuery.trim(),
+        category: selectedCategory || null,
+        min_price: parseNumeric(minPrice),
+        max_price: parseNumeric(maxPrice),
+        limit_count: 60,
+      });
+
+      if (!error) {
+        setSearchResults(data || []);
+      }
+      setIsSearching(false);
+    }, 250);
+
+    return () => window.clearTimeout(timeout);
+  }, [searchQuery, minPrice, maxPrice, selectedCategory, shouldSearch]);
+
   useEffect(() => {
     supabase.from('analytics_events').insert({
       event_type: 'page_view',
       path: '/',
     });
   }, []);
+
+  const productsToShow = shouldSearch ? searchResults : filteredProducts;
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-background to-muted/30">
@@ -75,6 +118,29 @@ const Index = () => {
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             {heroSubtitle}
           </p>
+        </div>
+      </section>
+
+      {/* Search */}
+      <section className="pb-6 px-4">
+        <div className="container max-w-6xl mx-auto">
+          <div className="grid gap-3 md:grid-cols-[2fr_1fr_1fr]">
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Buscar productos..."
+            />
+            <Input
+              value={minPrice}
+              onChange={(e) => setMinPrice(e.target.value)}
+              placeholder="Precio mín."
+            />
+            <Input
+              value={maxPrice}
+              onChange={(e) => setMaxPrice(e.target.value)}
+              placeholder="Precio máx."
+            />
+          </div>
         </div>
       </section>
 
@@ -125,7 +191,7 @@ const Index = () => {
             {activeCategoryName ? `${activeCategoryName}` : 'Productos Destacados'}
           </h2>
 
-          {isLoading ? (
+          {isLoading || isSearching ? (
             <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {Array.from({ length: 10 }).map((_, i) => (
                 <Card key={i} className="overflow-hidden">
@@ -138,9 +204,9 @@ const Index = () => {
                 </Card>
               ))}
             </div>
-          ) : filteredProducts && filteredProducts.length > 0 ? (
+          ) : productsToShow && productsToShow.length > 0 ? (
             <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-              {filteredProducts.map((product) => (
+              {productsToShow.map((product) => (
                 <Link 
                   key={product.id} 
                   to={`/producto/${product.slug}`}

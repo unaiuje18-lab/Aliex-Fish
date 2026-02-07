@@ -7,6 +7,8 @@ export interface Product {
   subtitle: string | null;
   description: string | null;
   price: string;
+  price_min: number | null;
+  price_max: number | null;
   original_price: string | null;
   discount: string | null;
   affiliate_link: string;
