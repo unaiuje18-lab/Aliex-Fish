@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { normalizeImageUrl } from '@/lib/imageUrl';
 
 interface ProductImage {
   id: string;
@@ -111,7 +112,7 @@ export function ProductImageGallery({
                   )}
                   <div className="aspect-square bg-muted">
                     <img
-                      src={image.image_url}
+                      src={normalizeImageUrl(image.image_url)}
                       alt={image.title || `${productTitle} - ${actualIndex + 1}`}
                       loading="lazy"
                       decoding="async"
@@ -151,7 +152,7 @@ export function ProductImageGallery({
       <div className="flex-1 flex flex-col gap-2">
         <div className="relative aspect-square rounded-xl overflow-hidden bg-muted/50">
           <img
-            src={selectedImage?.image_url}
+            src={normalizeImageUrl(selectedImage?.image_url || '')}
             alt={selectedImage?.title || productTitle}
             loading="eager"
             decoding="async"

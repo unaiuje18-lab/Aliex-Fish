@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Upload, X, Loader2, Image as ImageIcon, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { compressImage } from '@/lib/imageCompression';
+import { normalizeImageUrl } from '@/lib/imageUrl';
 
 interface ImageWithTitle {
   url: string;
@@ -132,7 +133,8 @@ export function MultiImageUpload({ images, onChange, maxImages = 99 }: MultiImag
 
   const handleAddUrl = () => {
     if (urlInputValue.trim() && images.length < maxImages) {
-      onChange([...images, { url: urlInputValue.trim(), title: '', price: '' }]);
+      const normalizedUrl = normalizeImageUrl(urlInputValue.trim());
+      onChange([...images, { url: normalizedUrl, title: '', price: '' }]);
       setUrlInputValue('');
     }
   };
@@ -147,7 +149,7 @@ export function MultiImageUpload({ images, onChange, maxImages = 99 }: MultiImag
           <div key={index} className="relative group space-y-2">
             <div className="relative">
               <img
-                src={image.url}
+                src={normalizeImageUrl(image.url)}
                 alt={image.title || `Imagen ${index + 1}`}
                 className="w-full aspect-square object-cover rounded-lg border"
               />

@@ -25,6 +25,9 @@ import { Link } from 'react-router-dom';
 import { MultiImageUpload } from '@/components/admin/MultiImageUpload';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { supabase } from '@/integrations/supabase/client';
+import { normalizeImageUrl } from '@/lib/imageUrl';
 
 const iconOptions = [
   'Check', 'Zap', 'Shield', 'Battery', 'Headphones', 'Star', 'Heart', 
@@ -95,6 +98,9 @@ export default function AdminProductForm() {
   const [reviewCount, setReviewCount] = useState('0');
   const [isPublished, setIsPublished] = useState(false);
   const [category, setCategory] = useState('otros');
+  const [isScraping, setIsScraping] = useState(false);
+  const [scrapeError, setScrapeError] = useState('');
+  const [lastScrapedUrl, setLastScrapedUrl] = useState('');
 
   // Categories
   const { data: categories } = useCategories();
@@ -128,12 +134,12 @@ export default function AdminProductForm() {
       
       // Load images from product_images table or fallback to main_image_url
       const imagesWithTitles = existingProduct.images?.map(img => ({
-        url: img.image_url,
+        url: normalizeImageUrl(img.image_url),
         title: img.title || '',
         price: img.price || ''
       })) || [];
       if (imagesWithTitles.length === 0 && existingProduct.main_image_url) {
-        setProductImages([{ url: existingProduct.main_image_url, title: '', price: '' }]);
+        setProductImages([{ url: normalizeImageUrl(existingProduct.main_image_url), title: '', price: '' }]);
       } else {
         setProductImages(imagesWithTitles);
       }
@@ -171,6 +177,80 @@ export default function AdminProductForm() {
       setSlug(generateSlug(title));
     }
   }, [title, isEditing]);
+
+  const handleScrapeFromAliExpress = async (requestedUrl?: string) => {
+    const targetUrl = (requestedUrl || aliexpressUrl || affiliateLink).trim();
+    if (!targetUrl) {
+      toast({
+        variant: 'destructive',
+        title: 'URL requerida',
+        description: 'Pega un link de AliExpress o de afiliado para extraer datos.',
+      });
+      return;
+    }
+
+    if (targetUrl === lastScrapedUrl) {
+      return;
+    }
+
+    setIsScraping(true);
+    setScrapeError('');
+
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('scrape-aliexpress', {
+        body: { url: targetUrl },
+      });
+
+      if (fnError) {
+        throw new Error(fnError.message);
+      }
+
+      if (!data?.success) {
+        throw new Error(data?.error || 'No se pudo extraer la información');
+      }
+
+      const scraped = data.data;
+
+      setTitle(scraped.title || '');
+      setSubtitle(scraped.subtitle || '');
+      setPrice(scraped.priceRange || scraped.price || '');
+      setOriginalPrice(scraped.originalPrice || '');
+      setDiscount(scraped.discount || '');
+      setAffiliateLink(scraped.affiliateLink || affiliateLink);
+      setAliexpressUrl(scraped.aliexpressUrl || aliexpressUrl);
+      setRating(String(scraped.rating ?? rating));
+      setReviewCount(String(scraped.reviewCount ?? reviewCount));
+
+      if (!isEditing && scraped.title) {
+        setSlug(generateSlug(scraped.title));
+      }
+
+      const scrapedImages: string[] = Array.isArray(scraped.images) ? scraped.images : [];
+      if (scrapedImages.length > 0) {
+        setProductImages(scrapedImages.map((url: string) => ({
+          url: normalizeImageUrl(url),
+          title: '',
+          price: ''
+        })));
+      }
+
+      setLastScrapedUrl(targetUrl);
+      toast({
+        title: 'Datos extraídos',
+        description: `Se encontraron ${scrapedImages.length || 0} imágenes.`,
+      });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Error al extraer datos.';
+      setScrapeError(errorMessage);
+      toast({
+        variant: 'destructive',
+        title: 'Error al extraer',
+        description: errorMessage,
+      });
+    } finally {
+      setIsScraping(false);
+    }
+  };
 
   const isSaving = createProduct.isPending || updateProduct.isPending || 
     updateBenefits.isPending || updateVideos.isPending || 
@@ -407,6 +487,7 @@ export default function AdminProductForm() {
                     id="affiliateLink"
                     value={affiliateLink}
                     onChange={(e) => setAffiliateLink(e.target.value)}
+                    onBlur={() => handleScrapeFromAliExpress(affiliateLink)}
                     placeholder="https://s.click.aliexpress.com/..."
                     required
                   />
@@ -418,8 +499,32 @@ export default function AdminProductForm() {
                     id="aliexpressUrl"
                     value={aliexpressUrl}
                     onChange={(e) => setAliexpressUrl(e.target.value)}
+                    onBlur={() => handleScrapeFromAliExpress(aliexpressUrl)}
                     placeholder="https://aliexpress.com/item/..."
                   />
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleScrapeFromAliExpress}
+                      disabled={isScraping || (!aliexpressUrl.trim() && !affiliateLink.trim())}
+                    >
+                      {isScraping ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Plus className="h-4 w-4 mr-2" />
+                      )}
+                      Extraer datos del link
+                    </Button>
+                    <span className="text-xs text-muted-foreground">
+                      Rellena título, descripción, precio e imágenes.
+                    </span>
+                  </div>
+                  {scrapeError && (
+                    <Alert variant="destructive">
+                      <AlertDescription>{scrapeError}</AlertDescription>
+                    </Alert>
+                  )}
                 </div>
 
                 <div className="space-y-2">

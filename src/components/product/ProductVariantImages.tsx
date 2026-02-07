@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils';
+import { normalizeImageUrl } from '@/lib/imageUrl';
 
 interface ProductImage {
   id: string;
@@ -44,7 +45,7 @@ export function ProductVariantImages({
           >
             <div className="aspect-square bg-muted">
               <img
-                src={image.image_url}
+                src={normalizeImageUrl(image.image_url)}
                 alt={image.title || 'Variante'}
                 loading="lazy"
                 decoding="async"
