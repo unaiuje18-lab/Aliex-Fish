@@ -326,6 +326,33 @@ export function useUpdateProductFAQs() {
 }
 
 // Images mutations
+export function useUpdateProductOptions() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ productId, options }: { productId: string; options: { group: string; label: string; imageUrl?: string }[] }) => {
+      await supabase.from('product_options').delete().eq('product_id', productId);
+
+      if (options.length > 0) {
+        const { error } = await supabase
+          .from('product_options')
+          .insert(options.map((opt, i) => ({
+            product_id: productId,
+            group_title: opt.group,
+            option_label: opt.label,
+            option_image_url: opt.imageUrl || null,
+            extra_text: null,
+            display_order: i
+          })));
+
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['product'] });
+    },
+  });
+}
 export function useUpdateProductImages() {
   const queryClient = useQueryClient();
 
@@ -352,3 +379,4 @@ export function useUpdateProductImages() {
     },
   });
 }
+

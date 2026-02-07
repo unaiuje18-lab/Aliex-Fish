@@ -5,6 +5,7 @@ export interface Product {
   slug: string;
   title: string;
   subtitle: string | null;
+  description: string | null;
   price: string;
   original_price: string | null;
   discount: string | null;
@@ -12,6 +13,10 @@ export interface Product {
   aliexpress_url: string | null;
   main_image_url: string | null;
   video_url: string | null;
+  shipping_cost: string | null;
+  delivery_time: string | null;
+  sku: string | null;
+  orders_count: number | null;
   rating: number;
   review_count: number;
   is_published: boolean;

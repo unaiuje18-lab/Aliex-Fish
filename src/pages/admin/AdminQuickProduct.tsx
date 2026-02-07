@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { useCreateProduct, useUpdateProductBenefits, useUpdateProductReviews, useUpdateProductImages } from '@/hooks/useProducts';
+import { useCreateProduct, useUpdateProductBenefits, useUpdateProductReviews, useUpdateProductImages, useUpdateProductOptions } from '@/hooks/useProducts';
 import { useCategories } from '@/hooks/useCategories';
 import { ArrowLeft, Loader2, Zap, Link as LinkIcon, Check, AlertCircle, ImageIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -81,6 +81,7 @@ function generateReviews(productTitle: string): { name: string; rating: number; 
 interface ScrapedData {
   title: string;
   subtitle: string;
+  description: string;
   price: string;
   originalPrice: string;
   priceRange: string;
@@ -88,6 +89,11 @@ interface ScrapedData {
   images: string[];
   rating: number;
   reviewCount: number;
+  ordersCount: number;
+  shippingCost: string;
+  deliveryTime: string;
+  sku: string;
+  variants: { group: string; options: { label: string; imageUrl?: string }[] }[];
   slug: string;
   affiliateLink: string;
   aliexpressUrl: string;
@@ -100,6 +106,7 @@ export default function AdminQuickProduct() {
   const updateBenefits = useUpdateProductBenefits();
   const updateReviews = useUpdateProductReviews();
   const updateImages = useUpdateProductImages();
+  const updateOptions = useUpdateProductOptions();
 
   // Categories from database
   const { data: categories } = useCategories();
@@ -137,7 +144,7 @@ export default function AdminQuickProduct() {
     setSelectedImages([]);
 
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('scrape-aliexpress', {
+      const { data, error: fnError } = await supabase.functions.invoke('import-product', {
         body: { url: targetUrl },
       });
 
@@ -231,6 +238,7 @@ export default function AdminQuickProduct() {
         title: scrapedData.title,
         slug: scrapedData.slug,
         subtitle: scrapedData.subtitle || null,
+        description: scrapedData.description || null,
         price: scrapedData.price,
         original_price: scrapedData.originalPrice || null,
         discount: scrapedData.discount || null,
@@ -240,6 +248,10 @@ export default function AdminQuickProduct() {
         video_url: null,
         rating: scrapedData.rating,
         review_count: scrapedData.reviewCount,
+        orders_count: scrapedData.ordersCount || 0,
+        shipping_cost: scrapedData.shippingCost || null,
+        delivery_time: scrapedData.deliveryTime || null,
+        sku: scrapedData.sku || null,
         is_published: false,
         category,
       };
@@ -252,6 +264,20 @@ export default function AdminQuickProduct() {
           productId: newProduct.id,
           images: selectedImages.map(url => ({ url, title: '', price: '' })),
         });
+
+        if (scrapedData.variants?.length) {
+          const flatOptions = scrapedData.variants.flatMap(group =>
+            group.options.map(opt => ({
+              group: group.group,
+              label: opt.label,
+              imageUrl: opt.imageUrl
+            }))
+          );
+          await updateOptions.mutateAsync({
+            productId: newProduct.id,
+            options: flatOptions,
+          });
+        }
         
         // Add default benefits based on category
         const benefitsData = DEFAULT_BENEFITS[category] || DEFAULT_BENEFITS.default;

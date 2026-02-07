@@ -316,15 +316,20 @@ export type Database = {
           aliexpress_url: string | null
           category: string | null
           created_at: string
+          delivery_time: string | null
+          description: string | null
           discount: string | null
           id: string
           is_published: boolean | null
           main_image_url: string | null
+          orders_count: number | null
           original_price: string | null
           price: string
           rating: number | null
           review_count: number | null
+          shipping_cost: string | null
           slug: string
+          sku: string | null
           subtitle: string | null
           title: string
           updated_at: string
@@ -335,15 +340,20 @@ export type Database = {
           aliexpress_url?: string | null
           category?: string | null
           created_at?: string
+          delivery_time?: string | null
+          description?: string | null
           discount?: string | null
           id?: string
           is_published?: boolean | null
           main_image_url?: string | null
+          orders_count?: number | null
           original_price?: string | null
           price: string
           rating?: number | null
           review_count?: number | null
+          shipping_cost?: string | null
           slug: string
+          sku?: string | null
           subtitle?: string | null
           title: string
           updated_at?: string
@@ -354,15 +364,20 @@ export type Database = {
           aliexpress_url?: string | null
           category?: string | null
           created_at?: string
+          delivery_time?: string | null
+          description?: string | null
           discount?: string | null
           id?: string
           is_published?: boolean | null
           main_image_url?: string | null
+          orders_count?: number | null
           original_price?: string | null
           price?: string
           rating?: number | null
           review_count?: number | null
+          shipping_cost?: string | null
           slug?: string
+          sku?: string | null
           subtitle?: string | null
           title?: string
           updated_at?: string

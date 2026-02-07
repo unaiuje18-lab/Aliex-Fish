@@ -89,6 +89,7 @@ export default function AdminProductForm() {
   const [title, setTitle] = useState('');
   const [slug, setSlug] = useState('');
   const [subtitle, setSubtitle] = useState('');
+  const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   const [originalPrice, setOriginalPrice] = useState('');
   const [discount, setDiscount] = useState('');
@@ -96,6 +97,10 @@ export default function AdminProductForm() {
   const [aliexpressUrl, setAliexpressUrl] = useState('');
   const [rating, setRating] = useState('4.5');
   const [reviewCount, setReviewCount] = useState('0');
+  const [ordersCount, setOrdersCount] = useState('0');
+  const [shippingCost, setShippingCost] = useState('');
+  const [deliveryTime, setDeliveryTime] = useState('');
+  const [sku, setSku] = useState('');
   const [isPublished, setIsPublished] = useState(false);
   const [category, setCategory] = useState('otros');
   const [isScraping, setIsScraping] = useState(false);
@@ -122,6 +127,7 @@ export default function AdminProductForm() {
       setTitle(existingProduct.title);
       setSlug(existingProduct.slug);
       setSubtitle(existingProduct.subtitle || '');
+      setDescription(existingProduct.description || '');
       setPrice(existingProduct.price);
       setOriginalPrice(existingProduct.original_price || '');
       setDiscount(existingProduct.discount || '');
@@ -129,6 +135,10 @@ export default function AdminProductForm() {
       setAliexpressUrl(existingProduct.aliexpress_url || '');
       setRating(String(existingProduct.rating));
       setReviewCount(String(existingProduct.review_count));
+      setOrdersCount(String(existingProduct.orders_count || 0));
+      setShippingCost(existingProduct.shipping_cost || '');
+      setDeliveryTime(existingProduct.delivery_time || '');
+      setSku(existingProduct.sku || '');
       setIsPublished(existingProduct.is_published);
       setVideoUrl(existingProduct.video_url || '');
       setCategory(existingProduct.category || 'otros');
@@ -217,7 +227,7 @@ export default function AdminProductForm() {
     setScrapeError('');
 
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('scrape-aliexpress', {
+      const { data, error: fnError } = await supabase.functions.invoke('import-product', {
         body: { url: targetUrl },
       });
 
@@ -233,6 +243,7 @@ export default function AdminProductForm() {
 
       setTitle(scraped.title || '');
       setSubtitle(scraped.subtitle || '');
+      setDescription(scraped.description || '');
       setPrice(scraped.priceRange || scraped.price || '');
       setOriginalPrice(scraped.originalPrice || '');
       setDiscount(scraped.discount || '');
@@ -240,6 +251,10 @@ export default function AdminProductForm() {
       setAliexpressUrl(scraped.aliexpressUrl || aliexpressUrl);
       setRating(String(scraped.rating ?? rating));
       setReviewCount(String(scraped.reviewCount ?? reviewCount));
+      setOrdersCount(String(scraped.ordersCount ?? ordersCount));
+      setShippingCost(scraped.shippingCost || '');
+      setDeliveryTime(scraped.deliveryTime || '');
+      setSku(scraped.sku || '');
 
       if (!isEditing && scraped.title) {
         setSlug(generateSlug(scraped.title));
@@ -295,6 +310,7 @@ export default function AdminProductForm() {
         title,
         slug,
         subtitle: subtitle || null,
+        description: description || null,
         price,
         original_price: originalPrice || null,
         discount: discount || null,
@@ -304,6 +320,10 @@ export default function AdminProductForm() {
         video_url: videoUrl || null,
         rating: parseFloat(rating) || 4.5,
         review_count: parseInt(reviewCount) || 0,
+        orders_count: parseInt(ordersCount) || 0,
+        shipping_cost: shippingCost || null,
+        delivery_time: deliveryTime || null,
+        sku: sku || null,
         is_published: isPublished,
         category,
       };
@@ -467,6 +487,17 @@ export default function AdminProductForm() {
                     onChange={(e) => setSubtitle(e.target.value)}
                     placeholder="Sonido premium con cancelación de ruido activa..."
                     rows={3}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="description">Descripción del producto</Label>
+                  <Textarea
+                    id="description"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Detalles completos del producto..."
+                    rows={4}
                   />
                 </div>
 
@@ -938,6 +969,49 @@ export default function AdminProductForm() {
                       min="0"
                       value={reviewCount}
                       onChange={(e) => setReviewCount(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="ordersCount">Numero de pedidos</Label>
+                    <Input
+                      id="ordersCount"
+                      type="number"
+                      min="0"
+                      value={ordersCount}
+                      onChange={(e) => setOrdersCount(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="sku">SKU</Label>
+                    <Input
+                      id="sku"
+                      value={sku}
+                      onChange={(e) => setSku(e.target.value)}
+                      placeholder="SKU-12345"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="shippingCost">Coste de envio</Label>
+                    <Input
+                      id="shippingCost"
+                      value={shippingCost}
+                      onChange={(e) => setShippingCost(e.target.value)}
+                      placeholder="EUR0.00"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="deliveryTime">Tiempo de entrega</Label>
+                    <Input
+                      id="deliveryTime"
+                      value={deliveryTime}
+                      onChange={(e) => setDeliveryTime(e.target.value)}
+                      placeholder="7-12 dias"
                     />
                   </div>
                 </div>
