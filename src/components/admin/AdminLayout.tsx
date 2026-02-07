@@ -9,7 +9,8 @@ import {
   Menu,
   X,
   ExternalLink,
-  FolderOpen
+  FolderOpen,
+  TextCursorInput
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -22,6 +23,7 @@ const navItems = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/productos', label: 'Productos', icon: Package },
   { href: '/admin/categorias', label: 'Categorías', icon: FolderOpen },
+  { href: '/admin/textos', label: 'Textos', icon: TextCursorInput },
 ];
 
 export function AdminLayout({ children }: AdminLayoutProps) {

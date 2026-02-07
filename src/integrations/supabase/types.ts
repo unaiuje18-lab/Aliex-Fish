@@ -370,6 +370,30 @@ export type Database = {
         }
         Relationships: []
       }
+      site_settings: {
+        Row: {
+          footer_text: string
+          hero_subtitle: string
+          hero_title: string
+          id: number
+          updated_at: string
+        }
+        Insert: {
+          footer_text: string
+          hero_subtitle: string
+          hero_title: string
+          id?: number
+          updated_at?: string
+        }
+        Update: {
+          footer_text?: string
+          hero_subtitle?: string
+          hero_title?: string
+          id?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string

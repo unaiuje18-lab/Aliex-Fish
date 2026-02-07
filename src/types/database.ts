@@ -97,3 +97,11 @@ export interface UserRole {
   role: AppRole;
   created_at: string;
 }
+
+export interface SiteSettings {
+  id: number;
+  hero_title: string;
+  hero_subtitle: string;
+  footer_text: string;
+  updated_at: string;
+}

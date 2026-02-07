@@ -13,6 +13,7 @@ import AdminProducts from "./pages/admin/AdminProducts";
 import AdminProductForm from "./pages/admin/AdminProductForm";
 import AdminQuickProduct from "./pages/admin/AdminQuickProduct";
 import AdminCategories from "./pages/admin/AdminCategories";
+import AdminSiteSettings from "./pages/admin/AdminSiteSettings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -63,6 +64,11 @@ const App = () => (
             <Route path="/admin/categorias" element={
               <AdminRoute>
                 <AdminCategories />
+              </AdminRoute>
+            } />
+            <Route path="/admin/textos" element={
+              <AdminRoute>
+                <AdminSiteSettings />
               </AdminRoute>
             } />
             

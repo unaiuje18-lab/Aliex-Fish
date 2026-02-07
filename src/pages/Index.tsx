@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Star, ShoppingCart, Settings } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSiteSettings } from '@/hooks/useSiteSettings';
 
 const Index = () => {
   const [searchParams] = useSearchParams();
@@ -14,6 +15,7 @@ const Index = () => {
   const { data: products, isLoading } = usePublishedProducts();
   const { data: categories, isLoading: categoriesLoading } = useCategories();
   const { isAdmin, user } = useAuth();
+  const { data: siteSettings } = useSiteSettings();
 
   // Filter products by selected category
   const filteredProducts = selectedCategory
@@ -22,6 +24,10 @@ const Index = () => {
 
   // Get the active category name for display
   const activeCategoryName = categories?.find(c => c.slug === selectedCategory)?.name;
+
+  const heroTitle = siteSettings?.hero_title || 'Los mejores productos de pesca de todo AliExpress';
+  const heroSubtitle = siteSettings?.hero_subtitle || 'Encuentra los mejores precios en artículos de pesca directamente desde AliExpress. ¡Equípate como un profesional sin gastar de más!';
+  const footerText = siteSettings?.footer_text || `© ${new Date().getFullYear()} MiTienda. Todos los derechos reservados.`;
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-background to-muted/30">
@@ -51,11 +57,10 @@ const Index = () => {
       <section className="py-12 md:py-16 text-center px-4">
         <div className="container max-w-4xl mx-auto">
           <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-            Los mejores productos de pesca de todo AliExpress
+            {heroTitle}
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Encuentra los mejores precios en artículos de pesca directamente desde AliExpress. 
-            ¡Equípate como un profesional sin gastar de más!
+            {heroSubtitle}
           </p>
         </div>
       </section>
@@ -203,7 +208,7 @@ const Index = () => {
       {/* Footer */}
       <footer className="border-t py-8 text-center text-sm text-muted-foreground">
         <div className="container max-w-6xl mx-auto px-4">
-          <p>© {new Date().getFullYear()} MiTienda. Todos los derechos reservados.</p>
+          <p>{footerText}</p>
         </div>
       </footer>
     </main>
@@ -211,3 +216,6 @@ const Index = () => {
 };
 
 export default Index;
+
+
+
