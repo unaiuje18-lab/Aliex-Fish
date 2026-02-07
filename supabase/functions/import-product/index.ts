@@ -267,6 +267,13 @@ async function resolveAliExpressUrl(url: string) {
         const body = await redirectRes2.text();
         const metaRefresh = body.match(/url=["']?([^"'\s>]+)/i);
         const resolvedCandidate = metaRefresh ? metaRefresh[1] : finalUrl;
+
+        const bodyProductId = extractProductIdFromText(body);
+        if (bodyProductId) {
+          formattedUrl = `https://www.aliexpress.com/item/${bodyProductId}.html`;
+          return buildResolved(formattedUrl, originalInputUrl);
+        }
+
         if (resolvedCandidate && resolvedCandidate !== formattedUrl) {
           if (containsProductId(resolvedCandidate)) {
             formattedUrl = resolvedCandidate;
@@ -283,8 +290,7 @@ async function resolveAliExpressUrl(url: string) {
     formattedUrl = `${urlObj.origin}${urlObj.pathname}`;
   } catch (_) {}
 
-  const productIdMatch = formattedUrl.match(/(?:item\/|productId=|itemId=|\/i\/)(\d{8,})/);
-  const productId = productIdMatch ? productIdMatch[1] : null;
+  const productId = extractProductIdFromText(formattedUrl);
 
   let scrapeUrl = formattedUrl;
   if (productId) {
@@ -293,6 +299,22 @@ async function resolveAliExpressUrl(url: string) {
   const mobileUrl = productId ? `https://m.aliexpress.com/item/${productId}.html` : '';
 
   return { originalInputUrl, formattedUrl, scrapeUrl, mobileUrl, resolvedUrl };
+}
+
+function buildResolved(formattedUrl: string, originalInputUrl: string) {
+  const productId = extractProductIdFromText(formattedUrl);
+  let scrapeUrl = formattedUrl;
+  if (productId) {
+    scrapeUrl = `https://www.aliexpress.com/item/${productId}.html`;
+  }
+  const mobileUrl = productId ? `https://m.aliexpress.com/item/${productId}.html` : '';
+  return { originalInputUrl, formattedUrl, scrapeUrl, mobileUrl, resolvedUrl: '' };
+}
+
+function extractProductIdFromText(text: string): string | null {
+  if (!text) return null;
+  const match = text.match(/(?:item\/|productId=|itemId=|\/i\/)(\d{8,})/i);
+  return match ? match[1] : null;
 }
 
 // ===== Parsing =====
