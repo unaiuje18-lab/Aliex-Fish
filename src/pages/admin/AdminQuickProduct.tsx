@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
@@ -110,18 +110,24 @@ export default function AdminQuickProduct() {
   const [isScraping, setIsScraping] = useState(false);
   const [scrapedData, setScrapedData] = useState<ScrapedData | null>(null);
   const [error, setError] = useState('');
+  const scrapeTimer = useRef<number | null>(null);
   
   // Image selection state
   const [showImageSelector, setShowImageSelector] = useState(false);
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
 
-  const handleScrape = async () => {
-    if (!aliexpressUrl.trim()) {
+  const handleScrape = async (requestedUrl?: string) => {
+    const targetUrl = (requestedUrl || aliexpressUrl).trim();
+    if (!targetUrl) {
       toast({
         variant: 'destructive',
         title: 'URL requerida',
         description: 'Por favor pega el link de AliExpress',
       });
+      return;
+    }
+
+    if (targetUrl === aliexpressUrl.trim() && isScraping) {
       return;
     }
 
@@ -132,7 +138,7 @@ export default function AdminQuickProduct() {
 
     try {
       const { data, error: fnError } = await supabase.functions.invoke('scrape-aliexpress', {
-        body: { url: aliexpressUrl },
+        body: { url: targetUrl },
       });
 
       if (fnError) {
@@ -169,6 +175,25 @@ export default function AdminQuickProduct() {
       setIsScraping(false);
     }
   };
+
+  useEffect(() => {
+    if (scrapeTimer.current) {
+      window.clearTimeout(scrapeTimer.current);
+    }
+
+    const targetUrl = aliexpressUrl.trim();
+    if (!targetUrl) return;
+
+    scrapeTimer.current = window.setTimeout(() => {
+      handleScrape(targetUrl);
+    }, 700);
+
+    return () => {
+      if (scrapeTimer.current) {
+        window.clearTimeout(scrapeTimer.current);
+      }
+    };
+  }, [aliexpressUrl]);
 
   const handleImageSelection = (images: string[]) => {
     setSelectedImages(images);

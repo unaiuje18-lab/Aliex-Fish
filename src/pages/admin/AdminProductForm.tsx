@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
@@ -101,6 +101,7 @@ export default function AdminProductForm() {
   const [isScraping, setIsScraping] = useState(false);
   const [scrapeError, setScrapeError] = useState('');
   const [lastScrapedUrl, setLastScrapedUrl] = useState('');
+  const scrapeTimer = useRef<number | null>(null);
 
   // Categories
   const { data: categories } = useCategories();
@@ -177,6 +178,25 @@ export default function AdminProductForm() {
       setSlug(generateSlug(title));
     }
   }, [title, isEditing]);
+
+  useEffect(() => {
+    if (scrapeTimer.current) {
+      window.clearTimeout(scrapeTimer.current);
+    }
+
+    const targetUrl = (aliexpressUrl || affiliateLink).trim();
+    if (!targetUrl) return;
+
+    scrapeTimer.current = window.setTimeout(() => {
+      handleScrapeFromAliExpress(targetUrl);
+    }, 700);
+
+    return () => {
+      if (scrapeTimer.current) {
+        window.clearTimeout(scrapeTimer.current);
+      }
+    };
+  }, [aliexpressUrl, affiliateLink]);
 
   const handleScrapeFromAliExpress = async (requestedUrl?: string) => {
     const targetUrl = (requestedUrl || aliexpressUrl || affiliateLink).trim();
