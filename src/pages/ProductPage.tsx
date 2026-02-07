@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useProduct } from '@/hooks/useProducts';
 import { ProductImageGallery } from '@/components/product/ProductImageGallery';
@@ -13,6 +13,7 @@ import { TrustSection } from '@/components/landing/TrustSection';
 import { FinalCTA } from '@/components/landing/FinalCTA';
 import { StickyMobileCTA } from '@/components/landing/StickyMobileCTA';
 import { Footer } from '@/components/landing/Footer';
+import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Home, Package, ShoppingCart, Star, Truck, Shield, RotateCcw } from 'lucide-react';
@@ -24,6 +25,15 @@ export default function ProductPage() {
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
   const [selectedImageTitle, setSelectedImageTitle] = useState<string | null>(null);
   const [selectedImagePrice, setSelectedImagePrice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!product) return;
+    supabase.from('analytics_events').insert({
+      event_type: 'product_view',
+      path: `/producto/${product.slug}`,
+      product_id: product.id,
+    });
+  }, [product]);
 
   if (isLoading) {
     return (
@@ -64,6 +74,11 @@ export default function ProductPage() {
   }
 
   const handleBuyClick = () => {
+    supabase.from('analytics_events').insert({
+      event_type: 'affiliate_click',
+      path: `/producto/${product.slug}`,
+      product_id: product.id,
+    });
     window.open(product.affiliate_link, "_blank", "noopener,noreferrer");
   };
 

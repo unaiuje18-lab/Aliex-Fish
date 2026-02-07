@@ -119,3 +119,11 @@ export interface SiteSocialLink {
   display_order: number;
   created_at: string;
 }
+
+export interface AnalyticsEvent {
+  id: string;
+  event_type: string;
+  path: string | null;
+  product_id: string | null;
+  created_at: string;
+}

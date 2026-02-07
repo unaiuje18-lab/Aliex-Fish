@@ -1,4 +1,5 @@
 import { Link, useSearchParams } from 'react-router-dom';
+import { useEffect } from 'react';
 import { usePublishedProducts } from '@/hooks/useProducts';
 import { useCategories } from '@/hooks/useCategories';
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { useSiteSocialLinks } from '@/hooks/useSiteSocialLinks';
 import { SocialIcon } from '@/components/social/SocialIcon';
+import { supabase } from '@/integrations/supabase/client';
 const Index = () => {
   const [searchParams] = useSearchParams();
   const selectedCategory = searchParams.get('categoria');
@@ -32,6 +34,13 @@ const Index = () => {
   const heroSubtitle = siteSettings?.hero_subtitle || 'Encuentra los mejores precios en artículos de pesca directamente desde AliExpress. ¡Equípate como un profesional sin gastar de más!';
   const footerText = siteSettings?.footer_text || `© ${new Date().getFullYear()} MiTienda. Todos los derechos reservados.`;
   const enabledSocials = (socialLinks || []).filter((s) => s.is_enabled && s.url);
+
+  useEffect(() => {
+    supabase.from('analytics_events').insert({
+      event_type: 'page_view',
+      path: '/',
+    });
+  }, []);
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-background to-muted/30">
