@@ -144,14 +144,14 @@ export function MultiImageUpload({ images, onChange, maxImages = 99 }: MultiImag
   return (
     <div className="space-y-4">
       {/* Current images grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
         {images.map((image, index) => (
           <div key={index} className="relative group space-y-2">
             <div className="relative">
               <img
                 src={normalizeImageUrl(image.url)}
                 alt={image.title || `Imagen ${index + 1}`}
-                className="w-full aspect-square object-cover rounded-lg border"
+                className="w-full aspect-square object-cover rounded-lg border max-w-[160px]"
               />
               <Button
                 type="button"
@@ -183,7 +183,7 @@ export function MultiImageUpload({ images, onChange, maxImages = 99 }: MultiImag
 
         {/* Add new image slot */}
         {canAddMore && (
-          <div className="border-2 border-dashed rounded-lg aspect-square flex flex-col items-center justify-center p-4 text-center">
+          <div className="border-2 border-dashed rounded-lg aspect-square flex flex-col items-center justify-center p-4 text-center max-w-[160px]">
             {uploadingIndex === images.length ? (
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             ) : (
