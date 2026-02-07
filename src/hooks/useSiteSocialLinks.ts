@@ -24,10 +24,12 @@ export function useUpdateSiteSocialLinks() {
     mutationFn: async (links: Omit<SiteSocialLink, 'id' | 'created_at'>[]) => {
       await supabase.from('site_social_links').delete().neq('id', '00000000-0000-0000-0000-000000000000');
 
-      if (links.length > 0) {
+      const cleanLinks = links.filter((link) => link.platform && link.url && link.url.trim().length > 0);
+
+      if (cleanLinks.length > 0) {
         const { error } = await supabase
           .from('site_social_links')
-          .insert(links.map((link, i) => ({ ...link, display_order: i + 1 })));
+          .insert(cleanLinks.map((link, i) => ({ ...link, display_order: i + 1 })));
 
         if (error) throw error;
       }

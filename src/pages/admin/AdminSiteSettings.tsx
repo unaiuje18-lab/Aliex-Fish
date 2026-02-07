@@ -57,14 +57,16 @@ export default function AdminSiteSettings() {
         footer_text: footerText.trim(),
       });
 
-      await updateSocialLinks.mutateAsync(
-        socials.map((s) => ({
+      const cleanSocials = socials
+        .map((s) => ({
           platform: s.platform,
-          url: s.url,
+          url: s.url.trim(),
           is_enabled: s.is_enabled,
           display_order: 0,
         }))
-      );
+        .filter((s) => s.platform && s.url.length > 0);
+
+      await updateSocialLinks.mutateAsync(cleanSocials);
 
       toast({
         title: 'Configuración guardada',
