@@ -72,9 +72,11 @@ Deno.serve(async (req) => {
     if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
       formattedUrl = `https://${formattedUrl}`;
     }
+    const originalInputUrl = formattedUrl;
 
     // ===== STEP 1: Resolve short/affiliate links to actual product URL =====
     const isShortLink = /s\.click\.aliexpress\.com|a\.aliexpress\.com|aliexpress\.ru\/\w+/i.test(formattedUrl);
+    let resolvedUrl = '';
     if (isShortLink) {
       console.log('Resolving short/affiliate link:', formattedUrl);
       try {
@@ -85,10 +87,15 @@ Deno.serve(async (req) => {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           },
         });
-        const resolvedUrl = redirectRes.url;
-        console.log('Resolved to:', resolvedUrl);
-        if (resolvedUrl && resolvedUrl !== formattedUrl) {
-          formattedUrl = resolvedUrl;
+        const resolvedCandidate = redirectRes.url;
+        console.log('Resolved to:', resolvedCandidate);
+        if (resolvedCandidate && resolvedCandidate !== formattedUrl) {
+          // Only replace if it looks like a product URL
+          if (containsProductId(resolvedCandidate)) {
+            formattedUrl = resolvedCandidate;
+          } else {
+            resolvedUrl = resolvedCandidate;
+          }
         }
       } catch (e) {
         console.log('HEAD redirect failed, trying GET:', e);
@@ -103,10 +110,14 @@ Deno.serve(async (req) => {
           // Also check for meta refresh or JS redirect in body
           const body = await redirectRes2.text();
           const metaRefresh = body.match(/url=["']?([^"'\s>]+)/i);
-          const resolvedUrl = metaRefresh ? metaRefresh[1] : finalUrl;
-          console.log('GET resolved to:', resolvedUrl);
-          if (resolvedUrl && resolvedUrl !== formattedUrl) {
-            formattedUrl = resolvedUrl;
+          const resolvedCandidate = metaRefresh ? metaRefresh[1] : finalUrl;
+          console.log('GET resolved to:', resolvedCandidate);
+          if (resolvedCandidate && resolvedCandidate !== formattedUrl) {
+            if (containsProductId(resolvedCandidate)) {
+              formattedUrl = resolvedCandidate;
+            } else {
+              resolvedUrl = resolvedCandidate;
+            }
           }
         } catch (e2) {
           console.log('GET redirect also failed:', e2);
@@ -125,7 +136,7 @@ Deno.serve(async (req) => {
     } catch (_) {}
 
     // Extract product ID
-    const productIdMatch = formattedUrl.match(/(?:item\/|productId=|\/i\/)(\d{8,})/);
+    const productIdMatch = formattedUrl.match(/(?:item\/|productId=|itemId=|\/i\/)(\d{8,})/);
     const productId = productIdMatch ? productIdMatch[1] : null;
     
     // Build canonical URL for best results
@@ -201,21 +212,49 @@ Deno.serve(async (req) => {
       console.log('HTML sample (first 500 chars):', html.substring(0, 500));
     }
 
-    let productData = parseAliExpressData(markdown, html, links, metadata, formattedUrl);
+    let productData = parseAliExpressData(markdown, html, links, metadata, originalInputUrl, scrapeUrl);
 
     // If scrape looks weak, try to find a canonical product URL and rescrape once
     if ((!productData.title || productData.images.length === 0) && links.length > 0) {
-      const canonicalUrl = extractCanonicalProductUrl(html, links);
+      const canonicalUrl = extractCanonicalProductUrl(html, links) 
+        || extractCanonicalFromHtml(html) 
+        || extractCanonicalFromMetadata(metadata);
       if (canonicalUrl && canonicalUrl !== scrapeUrl) {
         console.log('Retrying with canonical URL:', canonicalUrl);
         const second = await scrapeWithFirecrawl(canonicalUrl);
         if (second.ok) {
-          productData = parseAliExpressData(second.markdown, second.html, second.links, second.metadata, canonicalUrl);
+          productData = parseAliExpressData(second.markdown, second.html, second.links, second.metadata, originalInputUrl, canonicalUrl);
+        }
+      }
+    }
+
+    // Final fallback: try resolved URL if exists and looks different
+    if ((!productData.title || productData.images.length === 0) && resolvedUrl && resolvedUrl !== scrapeUrl) {
+      console.log('Retrying with resolved URL:', resolvedUrl);
+      const third = await scrapeWithFirecrawl(resolvedUrl);
+      if (third.ok) {
+        const canonicalFromThird = extractCanonicalProductUrl(third.html, third.links)
+          || extractCanonicalFromHtml(third.html)
+          || extractCanonicalFromMetadata(third.metadata);
+        if (canonicalFromThird && canonicalFromThird !== resolvedUrl) {
+          const fourth = await scrapeWithFirecrawl(canonicalFromThird);
+          if (fourth.ok) {
+            productData = parseAliExpressData(fourth.markdown, fourth.html, fourth.links, fourth.metadata, originalInputUrl, canonicalFromThird);
+          }
+        } else {
+          productData = parseAliExpressData(third.markdown, third.html, third.links, third.metadata, originalInputUrl, resolvedUrl);
         }
       }
     }
 
     console.log(`Extracted ${productData.images.length} images`);
+
+    if (!productData.title || productData.images.length === 0) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'No se pudo extraer datos del producto. Verifica que el link sea de un producto.' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     return new Response(
       JSON.stringify({ success: true, data: productData }),
@@ -238,7 +277,8 @@ function parseAliExpressData(
   html: string, 
   links: string[],
   metadata: Record<string, unknown>, 
-  originalUrl: string
+  affiliateUrl: string,
+  canonicalUrl: string
 ) {
   const title = extractTitle(markdown, metadata);
   const { price, originalPrice, priceRange } = extractPrices(markdown, metadata);
@@ -260,8 +300,8 @@ function parseAliExpressData(
     rating,
     reviewCount,
     slug: slug || `producto-${Date.now()}`,
-    affiliateLink: originalUrl,
-    aliexpressUrl: originalUrl,
+    affiliateLink: affiliateUrl,
+    aliexpressUrl: canonicalUrl,
   };
 }
 
@@ -490,6 +530,28 @@ function extractAllImages(
 
   console.log(`Found ${images.size} unique product images`);
   return Array.from(images);
+}
+
+function containsProductId(url: string): boolean {
+  return /(?:item\/|productId=|itemId=|\/i\/)(\d{8,})/i.test(url);
+}
+
+function extractCanonicalFromHtml(html: string): string | null {
+  const canonicalMatch = html.match(/<link[^>]+rel=["']canonical["'][^>]*href=["']([^"']+)["']/i);
+  if (canonicalMatch?.[1]) return canonicalMatch[1];
+
+  const ogUrlMatch = html.match(/<meta[^>]+property=["']og:url["'][^>]*content=["']([^"']+)["']/i);
+  if (ogUrlMatch?.[1]) return ogUrlMatch[1];
+
+  return null;
+}
+
+function extractCanonicalFromMetadata(metadata: Record<string, unknown>): string | null {
+  const ogUrl = metadata.ogUrl as string | undefined;
+  if (ogUrl) return ogUrl;
+  const canonical = (metadata.canonical as string) || (metadata['canonical_url'] as string);
+  if (canonical) return canonical;
+  return null;
 }
 
 function extractCanonicalProductUrl(html: string, links: string[]): string | null {
