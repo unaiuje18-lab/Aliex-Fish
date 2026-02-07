@@ -72,26 +72,71 @@ Deno.serve(async (req) => {
     if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
       formattedUrl = `https://${formattedUrl}`;
     }
-    
-    // Extract product ID and build a reliable URL
-    const productIdMatch = formattedUrl.match(/item\/(\d+)\.html/);
+
+    // ===== STEP 1: Resolve short/affiliate links to actual product URL =====
+    const isShortLink = /s\.click\.aliexpress\.com|a\.aliexpress\.com|aliexpress\.ru\/\w+/i.test(formattedUrl);
+    if (isShortLink) {
+      console.log('Resolving short/affiliate link:', formattedUrl);
+      try {
+        const redirectRes = await fetch(formattedUrl, {
+          method: 'HEAD',
+          redirect: 'follow',
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          },
+        });
+        const resolvedUrl = redirectRes.url;
+        console.log('Resolved to:', resolvedUrl);
+        if (resolvedUrl && resolvedUrl !== formattedUrl) {
+          formattedUrl = resolvedUrl;
+        }
+      } catch (e) {
+        console.log('HEAD redirect failed, trying GET:', e);
+        try {
+          const redirectRes2 = await fetch(formattedUrl, {
+            redirect: 'follow',
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            },
+          });
+          const finalUrl = redirectRes2.url;
+          // Also check for meta refresh or JS redirect in body
+          const body = await redirectRes2.text();
+          const metaRefresh = body.match(/url=["']?([^"'\s>]+)/i);
+          const resolvedUrl = metaRefresh ? metaRefresh[1] : finalUrl;
+          console.log('GET resolved to:', resolvedUrl);
+          if (resolvedUrl && resolvedUrl !== formattedUrl) {
+            formattedUrl = resolvedUrl;
+          }
+        } catch (e2) {
+          console.log('GET redirect also failed:', e2);
+        }
+      }
+    }
+
+    // ===== STEP 2: Normalize to canonical AliExpress URL =====
+    // Clean tracking params
+    try {
+      const urlObj = new URL(formattedUrl);
+      // Keep only essential path, remove tracking params
+      const cleanParams = new URLSearchParams();
+      // Some params like pdp_npi might be needed, but most are tracking
+      formattedUrl = `${urlObj.origin}${urlObj.pathname}`;
+    } catch (_) {}
+
+    // Extract product ID
+    const productIdMatch = formattedUrl.match(/(?:item\/|productId=|\/i\/)(\d{8,})/);
     const productId = productIdMatch ? productIdMatch[1] : null;
     
-    // Try different AliExpress domains
-    const urlsToTry = [
-      formattedUrl.replace(/https?:\/\/[^\/]+/, 'https://www.aliexpress.us'),
-      formattedUrl.replace(/https?:\/\/[^\/]+/, 'https://www.aliexpress.com'),
-      formattedUrl,
-    ];
-    
+    // Build canonical URL for best results
+    let scrapeUrl = formattedUrl;
     if (productId) {
-      // Build canonical URL if we found product ID
-      urlsToTry.unshift(`https://www.aliexpress.us/item/${productId}.html`);
+      scrapeUrl = `https://www.aliexpress.com/item/${productId}.html`;
     }
     
-    console.log('Will try URLs:', urlsToTry.slice(0, 2));
+    console.log('Final scrape URL:', scrapeUrl, '| Product ID:', productId);
 
-    // Use rawHtml to get unprocessed content including all image sources
+    // ===== STEP 3: Scrape with Firecrawl =====
     const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
       method: 'POST',
       headers: {
@@ -99,26 +144,24 @@ Deno.serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        url: formattedUrl,
+        url: scrapeUrl,
         formats: ['markdown', 'rawHtml', 'links'],
         onlyMainContent: false,
-        waitFor: 15000, // Wait 15 seconds for JavaScript to fully render
-        timeout: 120000, // 120 second timeout
+        waitFor: 10000,
+        timeout: 90000,
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept-Language': 'en-US,en;q=0.9',
+          'Accept-Language': 'en-US,en;q=0.9,es;q=0.8',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
         },
         actions: [
-          { type: 'wait', milliseconds: 6000 }, // Wait for initial load
-          { type: 'click', selector: 'body' }, // Click to dismiss any popups
+          { type: 'wait', milliseconds: 5000 },
+          { type: 'click', selector: 'body' },
           { type: 'wait', milliseconds: 1000 },
-          { type: 'scroll', direction: 'down', amount: 1000 },
+          { type: 'scroll', direction: 'down', amount: 2000 },
+          { type: 'wait', milliseconds: 3000 },
+          { type: 'scroll', direction: 'up', amount: 2000 },
           { type: 'wait', milliseconds: 2000 },
-          { type: 'scroll', direction: 'down', amount: 1000 },
-          { type: 'wait', milliseconds: 2000 },
-          { type: 'scroll', direction: 'up', amount: 2000 }, // Scroll back up
-          { type: 'wait', milliseconds: 3000 }, // Final wait for images
         ],
       }),
     });
