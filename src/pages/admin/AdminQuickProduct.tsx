@@ -278,6 +278,8 @@ export default function AdminQuickProduct() {
         sku: scrapedData.sku || null,
         is_published: false,
         category,
+        price_min: null,
+        price_max: null,
       };
 
       const newProduct = await createProduct.mutateAsync(productData);
@@ -379,7 +381,7 @@ export default function AdminQuickProduct() {
                 />
               </div>
               <Button 
-                onClick={handleScrape} 
+                onClick={() => handleScrape()} 
                 disabled={isScraping || !aliexpressUrl.trim()}
               >
                 {isScraping ? (
