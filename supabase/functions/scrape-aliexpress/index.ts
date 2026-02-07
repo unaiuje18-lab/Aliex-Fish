@@ -144,6 +144,7 @@ Deno.serve(async (req) => {
     if (productId) {
       scrapeUrl = `https://www.aliexpress.com/item/${productId}.html`;
     }
+    const mobileUrl = productId ? `https://m.aliexpress.com/item/${productId}.html` : '';
     
     console.log('Final scrape URL:', scrapeUrl, '| Product ID:', productId);
 
@@ -247,6 +248,15 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Final fallback: try mobile URL which often embeds product JSON
+    if ((!productData.title || productData.images.length === 0) && mobileUrl) {
+      console.log('Retrying with mobile URL:', mobileUrl);
+      const mobile = await scrapeWithFirecrawl(mobileUrl);
+      if (mobile.ok) {
+        productData = parseAliExpressData(mobile.markdown, mobile.html, mobile.links, mobile.metadata, originalInputUrl, mobileUrl);
+      }
+    }
+
     console.log(`Extracted ${productData.images.length} images`);
 
     if (!productData.title || productData.images.length === 0) {
@@ -280,7 +290,7 @@ function parseAliExpressData(
   affiliateUrl: string,
   canonicalUrl: string
 ) {
-  const title = extractTitle(markdown, metadata);
+  const title = extractTitle(markdown, html, metadata);
   const { price, originalPrice, priceRange } = extractPrices(markdown, metadata);
   const images = extractAllImages(html, markdown, links, metadata);
   const { rating, reviewCount } = extractRatingAndReviews(markdown);
@@ -305,8 +315,20 @@ function parseAliExpressData(
   };
 }
 
-function extractTitle(markdown: string, metadata: Record<string, unknown>): string {
+function extractTitle(markdown: string, html: string, metadata: Record<string, unknown>): string {
   let title = (metadata.title as string) || '';
+  if (!title && html) {
+    const ogTitle = html.match(/<meta[^>]+property=["']og:title["'][^>]*content=["']([^"']+)["']/i);
+    if (ogTitle?.[1]) title = ogTitle[1].trim();
+  }
+  if (!title && html) {
+    const twitterTitle = html.match(/<meta[^>]+name=["']twitter:title["'][^>]*content=["']([^"']+)["']/i);
+    if (twitterTitle?.[1]) title = twitterTitle[1].trim();
+  }
+  if (!title && html) {
+    const titleTag = html.match(/<title>([^<]+)<\/title>/i);
+    if (titleTag?.[1]) title = titleTag[1].trim();
+  }
   
   // Clean up AliExpress title suffixes
   title = title.replace(/\s*[-|–]\s*(AliExpress|Aliexpress).*$/i, '').trim();
@@ -414,6 +436,7 @@ function extractAllImages(
   // ========== METHOD 1: Extract ALL alicdn URLs (most aggressive) ==========
   // This catches images even when they don't have visible extensions
   const alicdnPattern = /https?:\/\/[a-z0-9.-]*alicdn\.com\/[^\s"'<>\\)]+/gi;
+  const alicdnProtocolRelativePattern = /\/\/[a-z0-9.-]*alicdn\.com\/[^\s"'<>\\)]+/gi;
   let match;
   alicdnPattern.lastIndex = 0;
   while ((match = alicdnPattern.exec(contentToSearch)) !== null) {
@@ -423,7 +446,17 @@ function extractAllImages(
     // Check if it looks like an image path
     if (url.includes('/kf/') || url.includes('/imgextra/') || /\.(jpg|jpeg|png|webp)/i.test(url)) {
       if (isValidProductImage(url)) {
-        images.add(upgradeToMaxResolution(url));
+        images.add(upgradeToMaxResolution(normalizeAlicdnUrl(url)));
+      }
+    }
+  }
+  alicdnProtocolRelativePattern.lastIndex = 0;
+  while ((match = alicdnProtocolRelativePattern.exec(contentToSearch)) !== null) {
+    let url = match[0];
+    url = url.replace(/[,;}\]]+$/, '');
+    if (url.includes('/kf/') || url.includes('/imgextra/') || /\.(jpg|jpeg|png|webp)/i.test(url)) {
+      if (isValidProductImage(url)) {
+        images.add(upgradeToMaxResolution(normalizeAlicdnUrl(url)));
       }
     }
   }
@@ -443,7 +476,7 @@ function extractAllImages(
     while ((match = pattern.exec(contentToSearch)) !== null) {
       const url = match[1];
       if (url.includes('alicdn.com') && isValidProductImage(url)) {
-        images.add(upgradeToMaxResolution(url));
+        images.add(upgradeToMaxResolution(normalizeAlicdnUrl(url)));
       }
     }
   }
@@ -462,7 +495,17 @@ function extractAllImages(
     url = url.replace(/[,;}\]]+$/, '');
     if (url.includes('/kf/') || url.includes('/imgextra/') || /\.(jpg|jpeg|png|webp)/i.test(url)) {
       if (isValidProductImage(url)) {
-        images.add(upgradeToMaxResolution(url));
+        images.add(upgradeToMaxResolution(normalizeAlicdnUrl(url)));
+      }
+    }
+  }
+  alicdnProtocolRelativePattern.lastIndex = 0;
+  while ((match = alicdnProtocolRelativePattern.exec(unescapedContent)) !== null) {
+    let url = match[0];
+    url = url.replace(/[,;}\]]+$/, '');
+    if (url.includes('/kf/') || url.includes('/imgextra/') || /\.(jpg|jpeg|png|webp)/i.test(url)) {
+      if (isValidProductImage(url)) {
+        images.add(upgradeToMaxResolution(normalizeAlicdnUrl(url)));
       }
     }
   }
@@ -471,7 +514,7 @@ function extractAllImages(
   // ========== METHOD 4: Extract from links array ==========
   for (const link of links) {
     if (link.includes('alicdn.com') && isValidProductImage(link)) {
-      images.add(upgradeToMaxResolution(link));
+      images.add(upgradeToMaxResolution(normalizeAlicdnUrl(link)));
     }
   }
   
@@ -479,7 +522,7 @@ function extractAllImages(
   if (metadata.ogImage) {
     const ogImage = metadata.ogImage as string;
     if (isValidProductImage(ogImage)) {
-      images.add(upgradeToMaxResolution(ogImage));
+      images.add(upgradeToMaxResolution(normalizeAlicdnUrl(ogImage)));
     }
   }
   
@@ -490,7 +533,15 @@ function extractAllImages(
     let url = match[0];
     url = url.replace(/[,;}\]"]+$/, '');
     if (isValidProductImage(url)) {
-      images.add(upgradeToMaxResolution(url));
+      images.add(upgradeToMaxResolution(normalizeAlicdnUrl(url)));
+    }
+  }
+  alicdnProtocolRelativePattern.lastIndex = 0;
+  while ((match = alicdnProtocolRelativePattern.exec(metaStr)) !== null) {
+    let url = match[0];
+    url = url.replace(/[,;}\]"]+$/, '');
+    if (isValidProductImage(url)) {
+      images.add(upgradeToMaxResolution(normalizeAlicdnUrl(url)));
     }
   }
   
@@ -506,12 +557,12 @@ function extractAllImages(
   for (const pattern of jsonPatterns) {
     pattern.lastIndex = 0;
     while ((match = pattern.exec(contentToSearch)) !== null) {
-      const urls = match[1].match(/https?:\/\/[^\s"',\\]+/gi);
+      const urls = match[1].match(/(https?:\/\/|\/\/)[^\s"',\\]+/gi);
       if (urls) {
         for (let url of urls) {
           url = url.replace(/\\u002F/gi, '/').replace(/\\\//g, '/');
           if (url.includes('alicdn.com') && isValidProductImage(url)) {
-            images.add(upgradeToMaxResolution(url));
+            images.add(upgradeToMaxResolution(normalizeAlicdnUrl(url)));
           }
         }
       }
@@ -524,7 +575,7 @@ function extractAllImages(
   while ((match = markdownImagePattern.exec(markdown)) !== null) {
     const url = match[1];
     if (url.includes('alicdn.com') && isValidProductImage(url)) {
-      images.add(upgradeToMaxResolution(url));
+      images.add(upgradeToMaxResolution(normalizeAlicdnUrl(url)));
     }
   }
 
@@ -534,6 +585,14 @@ function extractAllImages(
 
 function containsProductId(url: string): boolean {
   return /(?:item\/|productId=|itemId=|\/i\/)(\d{8,})/i.test(url);
+}
+
+function normalizeAlicdnUrl(url: string): string {
+  if (!url) return url;
+  let out = url.trim();
+  if (out.startsWith('//')) out = `https:${out}`;
+  if (out.startsWith('http://')) out = out.replace('http://', 'https://');
+  return out;
 }
 
 function extractCanonicalFromHtml(html: string): string | null {
@@ -581,7 +640,7 @@ function isValidProductImage(url: string): boolean {
   if (url.length < 20) return false;
   
   // Must look like an image URL
-  const isImage = /\.(jpg|jpeg|png|webp)(\?|$|_|\.)/i.test(url);
+  const isImage = /\.(jpg|jpeg|png|webp)(\?|$|_|\.)/i.test(url) || url.includes('/kf/') || url.includes('/imgextra/');
   if (!isImage) return false;
   
   // Exclude system/UI images
