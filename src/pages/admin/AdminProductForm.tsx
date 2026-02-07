@@ -43,6 +43,51 @@ function generateSlug(title: string): string {
     .trim();
 }
 
+function parsePrice(raw: string): { mode: 'single' | 'range'; from: string; to: string } {
+  const clean = (raw || '').trim();
+  if (!clean) return { mode: 'single', from: '', to: '' };
+
+  const rangeMatch = clean.match(/(\d+(?:[.,]\d{1,2})?)\s*[-–]\s*(\d+(?:[.,]\d{1,2})?)/);
+  if (rangeMatch) {
+    return { mode: 'range', from: rangeMatch[1], to: rangeMatch[2] };
+  }
+
+  const singleMatch = clean.match(/(\d+(?:[.,]\d{1,2})?)/);
+  if (singleMatch) {
+    return { mode: 'single', from: singleMatch[1], to: '' };
+  }
+
+  return { mode: 'single', from: clean, to: '' };
+}
+
+function buildPriceString(mode: 'single' | 'range', from: string, to: string): string {
+  const fromClean = from.trim();
+  const toClean = to.trim();
+  if (mode === 'range') {
+    if (!fromClean || !toClean) return '';
+    return `Desde €${fromClean} - €${toClean}`;
+  }
+  if (!fromClean) return '';
+  return `€${fromClean}`;
+}
+
+function parsePriceNumber(value: string): number | null {
+  const cleaned = value.replace(/[^\d.,]/g, '').replace(',', '.');
+  const num = parseFloat(cleaned);
+  if (Number.isNaN(num)) return null;
+  return num;
+}
+
+function calculateDiscountPercent(current: string, original: string): string {
+  const currentNum = parsePriceNumber(current);
+  const originalNum = parsePriceNumber(original);
+  if (!currentNum || !originalNum) return '';
+  if (originalNum <= currentNum) return '';
+  const discount = Math.round(((originalNum - currentNum) / originalNum) * 100);
+  if (discount <= 0 || discount >= 100) return '';
+  return `${discount}%`;
+}
+
 interface BenefitForm {
   icon: string;
   title: string;
@@ -88,7 +133,9 @@ export default function AdminProductForm() {
   const [slug, setSlug] = useState('');
   const [subtitle, setSubtitle] = useState('');
   const [description, setDescription] = useState('');
-  const [price, setPrice] = useState('');
+  const [priceMode, setPriceMode] = useState<'single' | 'range'>('single');
+  const [priceFrom, setPriceFrom] = useState('');
+  const [priceTo, setPriceTo] = useState('');
   const [originalPrice, setOriginalPrice] = useState('');
   const [discount, setDiscount] = useState('');
   const [affiliateLink, setAffiliateLink] = useState('');
@@ -122,7 +169,10 @@ export default function AdminProductForm() {
       setSlug(existingProduct.slug);
       setSubtitle(existingProduct.subtitle || '');
       setDescription(existingProduct.description || '');
-      setPrice(existingProduct.price);
+      const parsedPrice = parsePrice(existingProduct.price);
+      setPriceMode(parsedPrice.mode);
+      setPriceFrom(parsedPrice.from);
+      setPriceTo(parsedPrice.to);
       setOriginalPrice(existingProduct.original_price || '');
       setDiscount(existingProduct.discount || '');
       setAffiliateLink(existingProduct.affiliate_link);
@@ -183,6 +233,14 @@ export default function AdminProductForm() {
     }
   }, [title, isEditing]);
 
+  useEffect(() => {
+    if (priceMode !== 'single') {
+      setDiscount('');
+      return;
+    }
+    setDiscount(calculateDiscountPercent(priceFrom, originalPrice));
+  }, [priceMode, priceFrom, originalPrice]);
+
 
   const isSaving = createProduct.isPending || updateProduct.isPending || 
     updateBenefits.isPending || updateVideos.isPending || 
@@ -191,7 +249,8 @@ export default function AdminProductForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!title || !slug || !price || !affiliateLink) {
+    const finalPrice = buildPriceString(priceMode, priceFrom, priceTo);
+    if (!title || !slug || !finalPrice || !affiliateLink) {
       toast({
         variant: 'destructive',
         title: 'Campos requeridos',
@@ -208,7 +267,7 @@ export default function AdminProductForm() {
         slug,
         subtitle: subtitle || null,
         description: description || null,
-        price,
+        price: finalPrice,
         original_price: originalPrice || null,
         discount: discount || null,
         affiliate_link: affiliateLink,
@@ -400,22 +459,63 @@ export default function AdminProductForm() {
 
                 <div className="grid gap-4 md:grid-cols-3">
                   <div className="space-y-2">
-                    <Label htmlFor="price">Precio Actual *</Label>
-                    <Input
-                      id="price"
-                      value={price}
-                      onChange={(e) => setPrice(e.target.value)}
-                      placeholder="€29.99"
-                      required
-                    />
+                    <Label>Tipo de precio</Label>
+                    <Select value={priceMode} onValueChange={(value) => setPriceMode(value as 'single' | 'range')}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona tipo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="single">Precio �nico</SelectItem>
+                        <SelectItem value="range">Rango (desde-hasta)</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
+
+                  {priceMode === 'single' ? (
+                    <div className="space-y-2">
+                      <Label htmlFor="priceFrom">Precio *</Label>
+                      <Input
+                        id="priceFrom"
+                        value={priceFrom}
+                        onChange={(e) => setPriceFrom(e.target.value)}
+                        placeholder="29.99"
+                        required
+                      />
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="priceFrom">Desde *</Label>
+                        <Input
+                          id="priceFrom"
+                          value={priceFrom}
+                          onChange={(e) => setPriceFrom(e.target.value)}
+                          placeholder="29.99"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="priceTo">Hasta *</Label>
+                        <Input
+                          id="priceTo"
+                          value={priceTo}
+                          onChange={(e) => setPriceTo(e.target.value)}
+                          placeholder="59.99"
+                          required
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-3">
                   <div className="space-y-2">
                     <Label htmlFor="originalPrice">Precio Original</Label>
                     <Input
                       id="originalPrice"
                       value={originalPrice}
                       onChange={(e) => setOriginalPrice(e.target.value)}
-                      placeholder="€79.99"
+                      placeholder="79.99"
                     />
                   </div>
                   <div className="space-y-2">
@@ -423,7 +523,7 @@ export default function AdminProductForm() {
                     <Input
                       id="discount"
                       value={discount}
-                      onChange={(e) => setDiscount(e.target.value)}
+                      readOnly
                       placeholder="62%"
                     />
                   </div>
@@ -895,3 +995,5 @@ export default function AdminProductForm() {
     </AdminLayout>
   );
 }
+
+
