@@ -17,7 +17,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
-const EMOJI_OPTIONS = ['🎣', '🔄', '🔴', '🐟', '🪝', '🧵', '🎒', '👕', '📦', '⚓', '🌊', '🚤', '🦈', '🐠', '🎯'];
+const EMOJI_OPTIONS = ['??', '??', '??', '??', '??', '??', '??', '?', '??', '??', '??', '??', '??', '??', '??'];
 
 export default function AdminCategories() {
   const { toast } = useToast();
@@ -29,9 +29,9 @@ export default function AdminCategories() {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  
+
   const [newName, setNewName] = useState('');
-  const [newIcon, setNewIcon] = useState('📦');
+  const [newIcon, setNewIcon] = useState('??');
   const [editName, setEditName] = useState('');
   const [editIcon, setEditIcon] = useState('');
 
@@ -57,9 +57,9 @@ export default function AdminCategories() {
         icon: newIcon,
         display_order: (categories?.length || 0) + 1,
       });
-      toast({ title: 'Categoría creada' });
+      toast({ title: 'Categor�a creada' });
       setNewName('');
-      setNewIcon('📦');
+      setNewIcon('??');
       setIsAdding(false);
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Error', description: error.message });
@@ -79,7 +79,7 @@ export default function AdminCategories() {
         slug: generateSlug(editName),
         icon: editIcon,
       });
-      toast({ title: 'Categoría actualizada' });
+      toast({ title: 'Categor�a actualizada' });
       setEditingId(null);
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Error', description: error.message });
@@ -91,7 +91,7 @@ export default function AdminCategories() {
 
     try {
       await deleteCategory.mutateAsync(deleteId);
-      toast({ title: 'Categoría eliminada' });
+      toast({ title: 'Categor�a eliminada' });
       setDeleteId(null);
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Error', description: error.message });
@@ -109,15 +109,15 @@ export default function AdminCategories() {
       <div className="space-y-6 max-w-2xl mx-auto">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Categorías</h1>
+            <h1 className="text-2xl font-bold">Categor�as</h1>
             <p className="text-sm text-muted-foreground">
-              Gestiona las categorías de productos
+              Gestiona las categor�as de productos
             </p>
           </div>
           {!isAdding && (
             <Button onClick={() => setIsAdding(true)}>
               <Plus className="h-4 w-4 mr-2" />
-              Nueva Categoría
+              Nueva Categor�a
             </Button>
           )}
         </div>
@@ -125,7 +125,7 @@ export default function AdminCategories() {
         {isAdding && (
           <Card className="border-primary">
             <CardHeader>
-              <CardTitle className="text-lg">Nueva Categoría</CardTitle>
+              <CardTitle className="text-lg">Nueva Categor�a</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex gap-3">
@@ -145,9 +145,14 @@ export default function AdminCategories() {
                 </div>
                 <div className="flex-1 space-y-3">
                   <Input
+                    value={newIcon}
+                    onChange={(e) => setNewIcon(e.target.value)}
+                    placeholder="Emoji (puedes pegar cualquiera)"
+                  />
+                  <Input
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
-                    placeholder="Nombre de la categoría"
+                    placeholder="Nombre de la categor�a (puedes incluir emojis)"
                     onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
                   />
                   <div className="flex gap-2">
@@ -178,14 +183,14 @@ export default function AdminCategories() {
               </div>
             ) : categories?.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
-                No hay categorías. ¡Crea la primera!
+                No hay categor�as. �Crea la primera!
               </div>
             ) : (
               <div className="divide-y">
                 {categories?.map((category) => (
                   <div key={category.id} className="flex items-center gap-3 p-4 hover:bg-muted/50">
                     <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
-                    
+
                     {editingId === category.id ? (
                       <>
                         <div className="flex flex-wrap gap-1 max-w-[120px]">
@@ -202,6 +207,11 @@ export default function AdminCategories() {
                             </button>
                           ))}
                         </div>
+                        <Input
+                          value={editIcon}
+                          onChange={(e) => setEditIcon(e.target.value)}
+                          className="w-20"
+                        />
                         <Input
                           value={editName}
                           onChange={(e) => setEditName(e.target.value)}
@@ -241,9 +251,9 @@ export default function AdminCategories() {
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar categoría?</AlertDialogTitle>
+            <AlertDialogTitle>�Eliminar categor�a?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. Los productos de esta categoría quedarán sin categoría asignada.
+              Esta acci�n no se puede deshacer. Los productos de esta categor�a quedar�n sin categor�a asignada.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
