@@ -188,8 +188,8 @@ export default function ProductPage() {
               </div>
 
               {/* CTA Button - Visible */}
-              <div className="lg:sticky lg:top-24">
-                <div className="space-y-3 rounded-xl border bg-background/95 p-4 shadow-sm">
+              <div className="lg:fixed lg:bottom-6 lg:right-8 lg:w-[360px] lg:z-40">
+                <div className="space-y-3 rounded-xl border bg-background/95 p-4 shadow-lg">
                   <Button
                     variant="cta"
                     size="xl"
