@@ -172,7 +172,7 @@ const Index = () => {
                         </div>
                       )}
                     </div>
-                    <CardContent className="p-3 flex flex-col gap-1.5 h-full">
+                    <CardContent className="p-3 flex flex-col gap-1.5">
                       <div className="flex items-center gap-2">
                         {product.discount && (
                           <span className="text-[11px] font-semibold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">
@@ -183,7 +183,7 @@ const Index = () => {
                           {product.category}
                         </span>
                       </div>
-                      <h3 className="font-semibold text-[13.5px] leading-snug line-clamp-2 group-hover:text-primary transition-colors min-h-[40px]">
+                      <h3 className="font-semibold text-[13.5px] leading-snug line-clamp-2 group-hover:text-primary transition-colors">
                         {product.title}
                       </h3>
                       
@@ -201,7 +201,7 @@ const Index = () => {
                         </span>
                       </div>
 
-                      <div className="mt-auto flex items-baseline gap-2">
+                      <div className="flex items-baseline gap-2">
                         <span className="text-xl font-bold text-primary">
                           {product.price}
                         </span>
