@@ -65,7 +65,7 @@ const Index = () => {
       </header>
 
       {/* Hero */}
-      <section className="py-12 md:py-16 text-center px-4">
+      <section className="pt-10 pb-6 md:pt-12 md:pb-6 text-center px-4">
         <div className="container max-w-4xl mx-auto">
           <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
             {heroTitle}
@@ -77,14 +77,14 @@ const Index = () => {
       </section>
 
       {/* Smart Search */}
-      <section className="pb-6 px-4">
+      <section className="pb-4 px-4">
         <div className="container max-w-6xl mx-auto">
           <SmartSearch />
         </div>
       </section>
 
       {/* Categories Navigation */}
-      <section className="pb-8 px-4">
+      <section className="pb-6 px-4">
         <div className="container max-w-6xl mx-auto">
           <div className="flex flex-wrap justify-center gap-2 md:gap-3">
             {categoriesLoading ? (
@@ -124,9 +124,9 @@ const Index = () => {
       </section>
 
       {/* Products Grid */}
-      <section className="pb-24 px-4">
+      <section className="pb-20 px-4">
         <div className="container max-w-6xl mx-auto">
-          <h2 className="text-2xl md:text-3xl font-bold mb-8 text-center">
+          <h2 className="text-2xl md:text-3xl font-bold mb-5 text-center">
             {activeCategoryName ? `${activeCategoryName}` : 'Productos Destacados'}
           </h2>
 
