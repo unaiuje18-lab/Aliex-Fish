@@ -1,17 +1,16 @@
 import { Link, useSearchParams } from 'react-router-dom';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect } from 'react';
 import { usePublishedProducts } from '@/hooks/useProducts';
 import { useCategories } from '@/hooks/useCategories';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Star, ShoppingCart, Settings } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { useSiteSocialLinks } from '@/hooks/useSiteSocialLinks';
 import { SocialIcon } from '@/components/social/SocialIcon';
+import { SmartSearch } from '@/components/search/SmartSearch';
 import { supabase } from '@/integrations/supabase/client';
 const Index = () => {
   const [searchParams] = useSearchParams();
@@ -22,59 +21,17 @@ const Index = () => {
   const { isAdmin, user } = useAuth();
   const { data: siteSettings } = useSiteSettings();
   const { data: socialLinks } = useSiteSocialLinks();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [minPrice, setMinPrice] = useState('');
-  const [maxPrice, setMaxPrice] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
 
-  // Filter products by selected category
   const filteredProducts = selectedCategory
     ? products?.filter(product => product.category === selectedCategory)
     : products;
 
-  // Get the active category name for display
   const activeCategoryName = categories?.find(c => c.slug === selectedCategory)?.name;
 
   const heroTitle = siteSettings?.hero_title || 'Los mejores productos de pesca de todo AliExpress';
-  const heroSubtitle = siteSettings?.hero_subtitle || 'Encuentra los mejores precios en artículos de pesca directamente desde AliExpress. ¡Equípate como un profesional sin gastar de más!';
+  const heroSubtitle = siteSettings?.hero_subtitle || 'Encuentra los mejores precios en artículos de pesca directamente desde AliExpress.';
   const footerText = siteSettings?.footer_text || `© ${new Date().getFullYear()} MiTienda. Todos los derechos reservados.`;
   const enabledSocials = (socialLinks || []).filter((s) => s.is_enabled && s.url);
-
-  const shouldSearch = useMemo(() => {
-    return Boolean(searchQuery.trim() || minPrice.trim() || maxPrice.trim() || selectedCategory);
-  }, [searchQuery, minPrice, maxPrice, selectedCategory]);
-
-  const parseNumeric = (value: string) => {
-    const cleaned = value.replace(/[^\d.,]/g, '').replace(',', '.');
-    const num = parseFloat(cleaned);
-    return Number.isNaN(num) ? null : num;
-  };
-
-  useEffect(() => {
-    if (!shouldSearch) {
-      setSearchResults([]);
-      return;
-    }
-
-    const timeout = window.setTimeout(async () => {
-      setIsSearching(true);
-      const { data, error } = await (supabase as any).rpc('search_products', {
-        q: searchQuery.trim(),
-        category: selectedCategory || null,
-        min_price: parseNumeric(minPrice),
-        max_price: parseNumeric(maxPrice),
-        limit_count: 60,
-      });
-
-      if (!error) {
-        setSearchResults(data || []);
-      }
-      setIsSearching(false);
-    }, 250);
-
-    return () => window.clearTimeout(timeout);
-  }, [searchQuery, minPrice, maxPrice, selectedCategory, shouldSearch]);
 
   useEffect(() => {
     (supabase as any).from('analytics_events').insert({
@@ -82,8 +39,6 @@ const Index = () => {
       path: '/',
     });
   }, []);
-
-  const productsToShow = shouldSearch ? searchResults : filteredProducts;
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-background to-muted/30">
@@ -121,26 +76,10 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Search */}
+      {/* Smart Search */}
       <section className="pb-6 px-4">
         <div className="container max-w-6xl mx-auto">
-          <div className="grid gap-3 md:grid-cols-[2fr_1fr_1fr]">
-            <Input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar productos..."
-            />
-            <Input
-              value={minPrice}
-              onChange={(e) => setMinPrice(e.target.value)}
-              placeholder="Precio mín."
-            />
-            <Input
-              value={maxPrice}
-              onChange={(e) => setMaxPrice(e.target.value)}
-              placeholder="Precio máx."
-            />
-          </div>
+          <SmartSearch />
         </div>
       </section>
 
@@ -191,7 +130,7 @@ const Index = () => {
             {activeCategoryName ? `${activeCategoryName}` : 'Productos Destacados'}
           </h2>
 
-          {isLoading || isSearching ? (
+          {isLoading ? (
             <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {Array.from({ length: 10 }).map((_, i) => (
                 <Card key={i} className="overflow-hidden">
@@ -204,9 +143,9 @@ const Index = () => {
                 </Card>
               ))}
             </div>
-          ) : productsToShow && productsToShow.length > 0 ? (
+          ) : filteredProducts && filteredProducts.length > 0 ? (
             <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-              {productsToShow.map((product) => (
+              {filteredProducts.map((product) => (
                 <Link 
                   key={product.id} 
                   to={`/producto/${product.slug}`}
