@@ -104,12 +104,6 @@ export function ProductImageGallery({
                       : "border-border hover:border-primary/50"
                   )}
                 >
-                  {/* Title above thumbnail if exists */}
-                  {image.title && (
-                    <span className="text-[10px] md:text-xs text-muted-foreground bg-muted px-1 py-0.5 truncate w-full text-center">
-                      {image.title}
-                    </span>
-                  )}
                   <div className="aspect-square bg-muted">
                     <img
                       src={normalizeImageUrl(image.image_url)}
