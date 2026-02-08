@@ -46,7 +46,7 @@ export function SmartSearch() {
     <div ref={containerRef} className="relative w-full max-w-2xl mx-auto">
       {/* Search Input */}
       <div className={cn(
-        "relative flex items-center rounded-2xl border-2 bg-card transition-all duration-300",
+        "relative flex items-center rounded-2xl border-2 bg-card/80 backdrop-blur-md transition-all duration-300 shadow-sm",
         isOpen && results.length > 0
           ? "border-primary shadow-lg rounded-b-none"
           : "border-border hover:border-primary/50 focus-within:border-primary focus-within:shadow-lg"
@@ -59,7 +59,7 @@ export function SmartSearch() {
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => { if (results.length > 0) setIsOpen(true); }}
           onKeyDown={handleKeyDown}
-          placeholder="Â¿QuÃ© estÃ¡s buscando? SeÃ±uelos, caÃ±as, anzuelos..."
+          placeholder="¿Qué estás buscando? Señuelos, cañas, anzuelos..."
           className="w-full bg-transparent py-3.5 pl-12 pr-12 text-base outline-none placeholder:text-muted-foreground/60"
           autoComplete="off"
         />
@@ -78,8 +78,8 @@ export function SmartSearch() {
 
       {/* Results Dropdown */}
       {isOpen && results.length > 0 && (
-        <div className="absolute z-50 w-full bg-card border-2 border-t-0 border-primary rounded-b-2xl shadow-xl overflow-hidden animate-fade-in">
-          <div className="px-3 py-2 border-b border-border/50">
+        <div className="absolute z-50 w-full bg-card/95 backdrop-blur-md border-2 border-t-0 border-primary rounded-b-2xl shadow-xl overflow-hidden animate-fade-in">
+          <div className="px-3 py-2 border-b border-border/50 bg-gradient-to-b from-muted/40 to-transparent">
             <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
               <TrendingUp className="h-3 w-3" />
               {results.length} resultado{results.length !== 1 ? 's' : ''}
@@ -97,7 +97,7 @@ export function SmartSearch() {
                   )}
                 >
                   {/* Product Image */}
-                  <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+                  <div className="w-12 h-12 rounded-xl overflow-hidden bg-muted flex-shrink-0 ring-1 ring-border/60">
                     {product.main_image_url ? (
                       <img
                         src={product.main_image_url}
@@ -144,14 +144,14 @@ export function SmartSearch() {
 
       {/* No results message */}
       {isOpen && query.trim() && !isSearching && results.length === 0 && (
-        <div className="absolute z-50 w-full bg-card border-2 border-t-0 border-primary rounded-b-2xl shadow-xl overflow-hidden animate-fade-in">
+        <div className="absolute z-50 w-full bg-card/95 backdrop-blur-md border-2 border-t-0 border-primary rounded-b-2xl shadow-xl overflow-hidden animate-fade-in">
           <div className="px-4 py-8 text-center">
             <Search className="h-8 w-8 mx-auto text-muted-foreground/40 mb-2" />
             <p className="text-sm text-muted-foreground">
               No se encontraron productos para "<span className="font-medium text-foreground">{query}</span>"
             </p>
             <p className="text-xs text-muted-foreground/60 mt-1">
-              Prueba con otros tÃ©rminos de bÃºsqueda
+              Prueba con otros términos de búsqueda
             </p>
           </div>
         </div>
@@ -180,3 +180,4 @@ function highlightMatch(text: string, query: string) {
     </>
   );
 }
+
