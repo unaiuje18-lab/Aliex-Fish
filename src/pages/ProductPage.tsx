@@ -187,6 +187,23 @@ export default function ProductPage() {
                 )}
               </div>
 
+              {/* CTA Button - Visible */}
+              <div className="lg:sticky lg:top-24">
+                <div className="space-y-3 rounded-xl border bg-background/95 p-4 shadow-sm">
+                  <Button
+                    variant="cta"
+                    size="xl"
+                    onClick={handleBuyClick}
+                    className="w-full h-12 text-base shadow-lg"
+                  >
+                    <ShoppingCart className="w-5 h-5" />
+                    Comprar en AliExpress
+                  </Button>
+                  <p className="text-xs text-muted-foreground text-center">
+                    Pago 100% seguro - Envio rapido
+                  </p>
+                </div>
+              </div>
               {/* Image Variants Grid (if images have titles) */}
               {product.images && product.images.some(img => img.title) && (
                 <ProductVariantImages
@@ -224,24 +241,7 @@ export default function ProductPage() {
                   <RotateCcw className="w-4 h-4 text-primary" />
                   <span>Garantía incluida</span>
                 </div>
-              </div>
-
-              {/* CTA Button */}
-              <div className="space-y-3">
-                <Button
-                  variant="cta"
-                  size="xl"
-                  onClick={handleBuyClick}
-                  className="w-full"
-                >
-                  <ShoppingCart className="w-5 h-5" />
-                  Comprar Ahora
-                </Button>
-                <p className="text-xs text-muted-foreground text-center">
-                  🔒 Pago 100% seguro • Envío rápido
-                </p>
-              </div>
-            </div>
+              </div></div>
           </div>
         </div>
       </section>
@@ -305,3 +305,8 @@ export default function ProductPage() {
     </main>
   );
 }
+
+
+
+
+
