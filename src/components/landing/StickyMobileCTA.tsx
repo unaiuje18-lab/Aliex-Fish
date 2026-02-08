@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { ShoppingCart } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 
 interface StickyMobileCTAProps {
   price: string;
@@ -8,23 +8,13 @@ interface StickyMobileCTAProps {
 }
 
 export const StickyMobileCTA = ({ price, affiliateLink }: StickyMobileCTAProps) => {
-  const [isVisible, setIsVisible] = useState(false);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      // Show after scrolling 300px
-      setIsVisible(window.scrollY > 300);
-    };
-
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+  const displayPrice = useMemo(() => {
+    return (price || "").replace(/^Desde\s*/i, "");
+  }, [price]);
 
   const handleBuyClick = () => {
     window.open(affiliateLink, "_blank", "noopener,noreferrer");
   };
-
-  if (!isVisible) return null;
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 lg:hidden">
@@ -32,7 +22,7 @@ export const StickyMobileCTA = ({ price, affiliateLink }: StickyMobileCTAProps) 
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-xs text-muted-foreground">Precio especial</p>
-            <p className="text-xl font-display font-bold text-primary">{price}</p>
+            <p className="text-xl font-display font-bold text-primary">{displayPrice}</p>
           </div>
           <Button
             variant="cta"
