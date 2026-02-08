@@ -154,7 +154,7 @@ export default function ProductPage() {
               </div>
 
               {/* Title */}
-              <h1 className="text-2xl md:text-3xl font-bold text-foreground leading-tight">
+              <h1 className="text-xl md:text-2xl font-bold text-foreground leading-tight">
                 {product.title}
               </h1>
 
