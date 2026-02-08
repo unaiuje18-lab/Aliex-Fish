@@ -71,7 +71,7 @@ export function ProductImageGallery({
     <div className="flex gap-3 md:gap-4">
       {/* Thumbnails - Vertical on left */}
       {allImages.length > 1 && (
-        <div className="flex flex-col items-center gap-2 w-14 md:w-16 flex-shrink-0">
+        <div className="flex flex-col items-center gap-2 w-[60px] md:w-[72px] flex-shrink-0">
           {/* Scroll up button */}
           {showScrollButtons && (
             <button
@@ -98,7 +98,7 @@ export function ProductImageGallery({
                   key={image.id}
                   onClick={() => handleSelect(actualIndex)}
                   className={cn(
-                    "flex-shrink-0 w-14 md:w-16 rounded-lg overflow-hidden border-2 transition-all flex flex-col",
+                    "flex-shrink-0 w-[60px] md:w-[72px] rounded-lg overflow-hidden border-2 transition-all flex flex-col",
                     actualIndex === selectedIndex 
                       ? "border-primary ring-2 ring-primary/20" 
                       : "border-border hover:border-primary/50"
