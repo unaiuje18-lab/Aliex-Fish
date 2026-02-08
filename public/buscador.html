@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Buscador Inteligente</title>
+    <style>
+      :root {
+        --bg: #f7f5f2;
+        --surface: #ffffff;
+        --ink: #1f2937;
+        --muted: #6b7280;
+        --accent: #0f766e;
+        --accent-2: #0ea5a5;
+        --border: #e5e7eb;
+        --shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Poppins", "Segoe UI", system-ui, -apple-system, sans-serif;
+        background: radial-gradient(1200px 500px at 80% -10%, #e0f2f1 0%, transparent 60%),
+                    radial-gradient(900px 400px at -10% 10%, #fef3c7 0%, transparent 55%),
+                    var(--bg);
+        color: var(--ink);
+      }
+
+      .page {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 48px 20px 80px;
+      }
+
+      .hero {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 24px;
+        margin-bottom: 28px;
+      }
+
+      .hero h1 {
+        font-size: clamp(26px, 3vw, 38px);
+        margin: 0 0 8px;
+        letter-spacing: -0.02em;
+      }
+
+      .hero p {
+        margin: 0;
+        color: var(--muted);
+        max-width: 520px;
+      }
+
+      .search-card {
+        background: rgba(255, 255, 255, 0.9);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 16px;
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(12px);
+      }
+
+      .search-bar {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 10px 12px;
+      }
+
+      .search-bar input {
+        border: none;
+        outline: none;
+        flex: 1;
+        font-size: 16px;
+        background: transparent;
+      }
+
+      .autocomplete {
+        position: relative;
+      }
+
+      .suggestions {
+        position: absolute;
+        top: calc(100% + 8px);
+        left: 0;
+        right: 0;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        box-shadow: var(--shadow);
+        overflow: hidden;
+        z-index: 10;
+      }
+
+      .suggestions button {
+        width: 100%;
+        background: transparent;
+        border: none;
+        padding: 10px 14px;
+        text-align: left;
+        cursor: pointer;
+        font-size: 14px;
+      }
+
+      .suggestions button:hover {
+        background: #f3f4f6;
+      }
+
+      .stats {
+        margin-top: 12px;
+        font-size: 13px;
+        color: var(--muted);
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .stats span {
+        background: #f0fdfa;
+        color: #0f766e;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-weight: 600;
+      }
+
+      .results {
+        margin-top: 28px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 20px;
+      }
+
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .card:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--shadow);
+      }
+
+      .card img {
+        width: 100%;
+        height: 180px;
+        object-fit: cover;
+        background: #f9fafb;
+      }
+
+      .card-body {
+        padding: 14px 16px 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .card-title {
+        font-weight: 600;
+        font-size: 15px;
+        line-height: 1.3;
+      }
+
+      .card-meta {
+        font-size: 13px;
+        color: var(--muted);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .price {
+        font-weight: 700;
+        color: var(--accent);
+      }
+
+      .card button {
+        margin-top: 4px;
+        background: linear-gradient(120deg, var(--accent), var(--accent-2));
+        color: white;
+        border: none;
+        border-radius: 12px;
+        padding: 10px 12px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .empty {
+        margin-top: 40px;
+        text-align: center;
+        color: var(--muted);
+        font-size: 16px;
+        background: rgba(255, 255, 255, 0.85);
+        border: 1px dashed var(--border);
+        padding: 28px;
+        border-radius: 18px;
+      }
+
+      strong {
+        color: #0f172a;
+      }
+
+      @media (max-width: 720px) {
+        .hero {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
+        .search-card {
+          padding: 12px;
+        }
+
+        .card img {
+          height: 160px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <div>
+          <h1>Buscador inteligente de productos</h1>
+          <p>Encuentra rápidamente lo que necesitas con resultados en vivo, autocompletado y un diseño moderno tipo eCommerce.</p>
+        </div>
+      </section>
+
+      <section class="search-card">
+        <div class="autocomplete">
+          <div class="search-bar">
+            <input id="searchInput" type="text" placeholder="Busca por nombre, categoría o palabra clave..." autocomplete="off" />
+          </div>
+          <div id="suggestions" class="suggestions" hidden></div>
+        </div>
+        <div class="stats">
+          <span id="count">0</span>
+          <div>Resultados en tiempo real</div>
+        </div>
+      </section>
+
+      <section id="results" class="results"></section>
+      <section id="empty" class="empty" hidden>
+        No hemos encontrado productos 😢 — prueba con otra búsqueda.
+      </section>
+    </main>
+
+    <script>
+      const PRODUCTS_URL = "./products.json";
+      const input = document.getElementById("searchInput");
+      const resultsEl = document.getElementById("results");
+      const emptyEl = document.getElementById("empty");
+      const countEl = document.getElementById("count");
+      const suggestionsEl = document.getElementById("suggestions");
+
+      let products = [];
+      let indexed = [];
+      let lastQuery = "";
+
+      const normalize = (value) =>
+        value
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "");
+
+      const escapeHtml = (text) =>
+        text.replace(/[&<>"']/g, (ch) => ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#39;",
+        }[ch]));
+
+      const highlight = (text, query) => {
+        if (!query.trim()) return escapeHtml(text);
+        const words = [...new Set(normalize(query).split(/\s+/).filter(Boolean))];
+        if (!words.length) return escapeHtml(text);
+        const pattern = new RegExp(`(${words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`, "gi");
+        return escapeHtml(text).replace(pattern, "<strong>$1</strong>");
+      };
+
+      const buildIndex = (items) => items.map((item) => ({
+        ...item,
+        searchText: normalize([
+          item.name,
+          item.category,
+          item.description,
+          (item.keywords || []).join(" "),
+        ].join(" ")),
+      }));
+
+      const scoreMatch = (item, query) => {
+        const q = normalize(query);
+        let score = 0;
+        if (normalize(item.name).includes(q)) score += 5;
+        if (normalize(item.category).includes(q)) score += 3;
+        if (normalize(item.description).includes(q)) score += 2;
+        if ((item.keywords || []).some(k => normalize(k).includes(q))) score += 2;
+        return score;
+      };
+
+      const renderResults = (list, query) => {
+        resultsEl.innerHTML = "";
+        if (!list.length) {
+          emptyEl.hidden = false;
+          return;
+        }
+        emptyEl.hidden = true;
+        const fragment = document.createDocumentFragment();
+        list.forEach((item) => {
+          const card = document.createElement("article");
+          card.className = "card";
+          card.innerHTML = `
+            <img src="${item.image}" alt="${escapeHtml(item.name)}" loading="lazy" />
+            <div class="card-body">
+              <div class="card-title">${highlight(item.name, query)}</div>
+              <div class="card-meta">
+                <span>${highlight(item.category, query)}</span>
+                <span class="price">${escapeHtml(item.price)}</span>
+              </div>
+              <button data-url="${item.url}">Ver producto</button>
+            </div>
+          `;
+          fragment.appendChild(card);
+        });
+        resultsEl.appendChild(fragment);
+      };
+
+      const renderSuggestions = (list, query) => {
+        if (!query.trim()) {
+          suggestionsEl.hidden = true;
+          suggestionsEl.innerHTML = "";
+          return;
+        }
+        const suggestions = list.slice(0, 6).map(item => item.name);
+        if (!suggestions.length) {
+          suggestionsEl.hidden = true;
+          suggestionsEl.innerHTML = "";
+          return;
+        }
+        suggestionsEl.innerHTML = suggestions
+          .map(s => `<button type="button">${highlight(s, query)}</button>`)
+          .join("");
+        suggestionsEl.hidden = false;
+      };
+
+      const search = (query) => {
+        const q = query.trim();
+        if (!q) {
+          countEl.textContent = products.length.toString();
+          renderResults(products, "");
+          renderSuggestions([], "");
+          return;
+        }
+        const matches = indexed
+          .filter(item => item.searchText.includes(normalize(q)))
+          .map(item => ({ ...item, score: scoreMatch(item, q) }))
+          .sort((a, b) => b.score - a.score);
+        countEl.textContent = matches.length.toString();
+        renderResults(matches, q);
+        renderSuggestions(matches, q);
+      };
+
+      input.addEventListener("input", () => {
+        const value = input.value;
+        if (value === lastQuery) return;
+        lastQuery = value;
+        window.requestAnimationFrame(() => search(value));
+      });
+
+      suggestionsEl.addEventListener("click", (event) => {
+        const btn = event.target.closest("button");
+        if (!btn) return;
+        input.value = btn.textContent.replace(/\s+/g, " ").trim();
+        search(input.value);
+        suggestionsEl.hidden = true;
+      });
+
+      resultsEl.addEventListener("click", (event) => {
+        const btn = event.target.closest("button[data-url]");
+        if (!btn) return;
+        const url = btn.getAttribute("data-url");
+        if (url) window.location.href = url;
+      });
+
+      fetch(PRODUCTS_URL)
+        .then((res) => res.json())
+        .then((data) => {
+          products = data;
+          indexed = buildIndex(products);
+          countEl.textContent = products.length.toString();
+          renderResults(products, "");
+        })
+        .catch(() => {
+          emptyEl.hidden = false;
+          emptyEl.textContent = "No se pudieron cargar los productos.";
+        });
+    </script>
+  </body>
+</html>

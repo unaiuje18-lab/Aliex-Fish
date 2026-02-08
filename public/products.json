@@ -1,0 +1,82 @@
+[
+  {
+    "id": "p-001",
+    "name": "Señuelo Minnow Pro 12cm",
+    "price": "€12,90",
+    "category": "Señuelos",
+    "description": "Señuelo flotante con acción realista, ideal para depredadores en agua dulce y salada.",
+    "keywords": ["minnow", "depredadores", "pesca", "agua dulce", "agua salada"],
+    "image": "https://images.unsplash.com/photo-1517686469429-8bdb88b9f907?q=80&w=800&auto=format&fit=crop",
+    "url": "/producto/senuelo-minnow-pro-12cm"
+  },
+  {
+    "id": "p-002",
+    "name": "Caña Carbon X 2.10m",
+    "price": "€59,00",
+    "category": "Cañas",
+    "description": "Caña de carbono ligera con alta sensibilidad y acción rápida.",
+    "keywords": ["carbono", "ligera", "acción rápida", "pesca deportiva"],
+    "image": "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=800&auto=format&fit=crop",
+    "url": "/producto/cana-carbon-x-210"
+  },
+  {
+    "id": "p-003",
+    "name": "Carrete Ocean 3000",
+    "price": "€42,50",
+    "category": "Carretes",
+    "description": "Carrete resistente al agua salada con freno progresivo y bobina de aluminio.",
+    "keywords": ["carrete", "agua salada", "freno progresivo", "aluminio"],
+    "image": "https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?q=80&w=800&auto=format&fit=crop",
+    "url": "/producto/carrete-ocean-3000"
+  },
+  {
+    "id": "p-004",
+    "name": "Anzuelos Ultra Sharp (Pack 50)",
+    "price": "€9,90",
+    "category": "Anzuelos",
+    "description": "Anzuelos de acero alto carbono con punta química para máxima penetración.",
+    "keywords": ["anzuelos", "acero", "pack", "punta química"],
+    "image": "https://images.unsplash.com/photo-1519681393784-d120267933ba?q=80&w=800&auto=format&fit=crop",
+    "url": "/producto/anzuelos-ultra-sharp-50"
+  },
+  {
+    "id": "p-005",
+    "name": "Señuelo Topwater Walker",
+    "price": "€14,50",
+    "category": "Señuelos",
+    "description": "Señuelo de superficie con movimiento en zigzag para ataques explosivos.",
+    "keywords": ["topwater", "superficie", "walker", "zigzag"],
+    "image": "https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?q=80&w=800&auto=format&fit=crop",
+    "url": "/producto/senuelo-topwater-walker"
+  },
+  {
+    "id": "p-006",
+    "name": "Línea Trenzada 150m",
+    "price": "€19,90",
+    "category": "Líneas",
+    "description": "Línea trenzada de alta resistencia con baja memoria.",
+    "keywords": ["línea", "trenzada", "resistencia", "baja memoria"],
+    "image": "https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?q=80&w=800&auto=format&fit=crop",
+    "url": "/producto/linea-trenzada-150m"
+  },
+  {
+    "id": "p-007",
+    "name": "Caja Tackle Box Pro",
+    "price": "€24,90",
+    "category": "Accesorios",
+    "description": "Organizador modular con divisores ajustables para todo tu equipo.",
+    "keywords": ["tackle", "organizador", "accesorios", "modular"],
+    "image": "https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?q=80&w=800&auto=format&fit=crop",
+    "url": "/producto/caja-tackle-box-pro"
+  },
+  {
+    "id": "p-008",
+    "name": "Señuelo Jig Metal 28g",
+    "price": "€8,50",
+    "category": "Señuelos",
+    "description": "Jig metálico para lanzado largo y pesca vertical.",
+    "keywords": ["jig", "metal", "vertical", "lanzado largo"],
+    "image": "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=800&auto=format&fit=crop",
+    "url": "/producto/senuelo-jig-metal-28g"
+  }
+]
