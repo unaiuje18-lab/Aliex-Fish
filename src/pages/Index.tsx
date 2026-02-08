@@ -203,7 +203,7 @@ const Index = () => {
 
                       <div className="flex items-baseline gap-2">
                         <span className="text-xl font-bold text-primary">
-                          {product.price}
+                          {(product.price || '').replace(/^Desde\\s*/i, '')}
                         </span>
                         {product.original_price && (
                           <span className="text-xs text-muted-foreground line-through">
