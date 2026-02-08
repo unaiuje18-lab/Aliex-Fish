@@ -282,7 +282,7 @@ export default function ProductPage() {
       )}
 
       {/* Trust Section */}
-      <TrustSection />
+      {/* <TrustSection /> */}
 
       {/* Final CTA */}
       <FinalCTA
