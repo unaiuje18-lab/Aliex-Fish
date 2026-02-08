@@ -10,7 +10,6 @@ import { VideoGallery } from '@/components/landing/VideoGallery';
 import { ReviewsSection } from '@/components/landing/ReviewsSection';
 import { FAQSection } from '@/components/landing/FAQSection';
 import { TrustSection } from '@/components/landing/TrustSection';
-import { FinalCTA } from '@/components/landing/FinalCTA';
 import { StickyMobileCTA } from '@/components/landing/StickyMobileCTA';
 import { Footer } from '@/components/landing/Footer';
 import { supabase } from '@/integrations/supabase/client';
@@ -283,14 +282,6 @@ export default function ProductPage() {
 
       {/* Trust Section */}
       {/* <TrustSection /> */}
-
-      {/* Final CTA */}
-      <FinalCTA
-        title={product.title}
-        price={product.price}
-        originalPrice={product.original_price || ''}
-        affiliateLink={product.affiliate_link}
-      />
 
       {/* Footer */}
       <Footer />
