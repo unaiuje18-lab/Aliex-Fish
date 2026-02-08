@@ -149,10 +149,10 @@ const Index = () => {
                 <Link 
                   key={product.id} 
                   to={`/producto/${product.slug}`}
-                  className="group"
+                  className="group h-full"
                 >
-                  <Card className="overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
-                    <div className="aspect-square relative overflow-hidden bg-muted">
+                  <Card className="h-full overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 flex flex-col">
+                    <div className="aspect-[4/5] relative overflow-hidden bg-muted">
                       {product.main_image_url ? (
                         <img
                           src={product.main_image_url}
@@ -172,13 +172,13 @@ const Index = () => {
                         </div>
                       )}
                     </div>
-                    <CardContent className="p-4">
-                      <h3 className="font-semibold text-lg line-clamp-2 mb-2 group-hover:text-primary transition-colors">
+                    <CardContent className="p-4 flex flex-col gap-2 h-full">
+                      <h3 className="font-semibold text-base line-clamp-2 group-hover:text-primary transition-colors min-h-[44px]">
                         {product.title}
                       </h3>
                       
-                      <div className="flex items-center gap-1 mb-3">
-                        <div className="flex items-center text-warning">
+                      <div className="flex items-center gap-1 text-warning min-h-[20px]">
+                        <div className="flex items-center">
                           {Array.from({ length: 5 }).map((_, i) => (
                             <Star
                               key={i}
@@ -186,12 +186,12 @@ const Index = () => {
                             />
                           ))}
                         </div>
-                        <span className="text-sm text-muted-foreground">
+                        <span className="text-xs text-muted-foreground ml-1">
                           ({product.review_count})
                         </span>
                       </div>
 
-                      <div className="flex items-baseline gap-2">
+                      <div className="mt-auto flex items-baseline gap-2">
                         <span className="text-2xl font-bold text-primary">
                           {product.price}
                         </span>
@@ -250,6 +250,7 @@ const Index = () => {
 };
 
 export default Index;
+
 
 
 
