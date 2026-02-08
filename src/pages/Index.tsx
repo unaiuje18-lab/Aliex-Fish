@@ -131,7 +131,7 @@ const Index = () => {
           </h2>
 
           {isLoading ? (
-            <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
               {Array.from({ length: 10 }).map((_, i) => (
                 <Card key={i} className="overflow-hidden">
                   <Skeleton className="aspect-square w-full" />
@@ -144,7 +144,7 @@ const Index = () => {
               ))}
             </div>
           ) : filteredProducts && filteredProducts.length > 0 ? (
-            <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
               {filteredProducts.map((product) => (
                 <Link 
                   key={product.id} 
@@ -152,7 +152,7 @@ const Index = () => {
                   className="group h-full"
                 >
                   <Card className="h-full overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 flex flex-col">
-                    <div className="aspect-[4/5] relative overflow-hidden bg-muted">
+                    <div className="aspect-square relative overflow-hidden bg-muted">
                       {product.main_image_url ? (
                         <img
                           src={product.main_image_url}
@@ -172,12 +172,22 @@ const Index = () => {
                         </div>
                       )}
                     </div>
-                    <CardContent className="p-4 flex flex-col gap-2 h-full">
-                      <h3 className="font-semibold text-base line-clamp-2 group-hover:text-primary transition-colors min-h-[44px]">
+                    <CardContent className="p-3 flex flex-col gap-1.5 h-full">
+                      <div className="flex items-center gap-2">
+                        {product.discount && (
+                          <span className="text-[11px] font-semibold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">
+                            Promo
+                          </span>
+                        )}
+                        <span className="text-[11px] text-muted-foreground">
+                          {product.category}
+                        </span>
+                      </div>
+                      <h3 className="font-semibold text-[13.5px] leading-snug line-clamp-2 group-hover:text-primary transition-colors min-h-[40px]">
                         {product.title}
                       </h3>
                       
-                      <div className="flex items-center gap-1 text-warning min-h-[20px]">
+                      <div className="flex items-center gap-1 text-warning min-h-[18px]">
                         <div className="flex items-center">
                           {Array.from({ length: 5 }).map((_, i) => (
                             <Star
@@ -186,17 +196,17 @@ const Index = () => {
                             />
                           ))}
                         </div>
-                        <span className="text-xs text-muted-foreground ml-1">
+                        <span className="text-[11px] text-muted-foreground ml-1">
                           ({product.review_count})
                         </span>
                       </div>
 
                       <div className="mt-auto flex items-baseline gap-2">
-                        <span className="text-2xl font-bold text-primary">
+                        <span className="text-xl font-bold text-primary">
                           {product.price}
                         </span>
                         {product.original_price && (
-                          <span className="text-sm text-muted-foreground line-through">
+                          <span className="text-xs text-muted-foreground line-through">
                             {product.original_price}
                           </span>
                         )}
