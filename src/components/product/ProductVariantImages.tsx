@@ -31,13 +31,13 @@ export function ProductVariantImages({
       <h3 className="text-sm font-semibold text-foreground">
         Color: <span className="font-normal">{titledImages.find(img => img.id === selectedId)?.title || titledImages[0]?.title}</span>
       </h3>
-      <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-2">
+      <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-7 lg:grid-cols-8 gap-1.5">
         {titledImages.map((image) => (
           <button
             key={image.id}
             onClick={() => onSelect(image)}
             className={cn(
-              "relative rounded-lg overflow-hidden border-2 transition-all hover:border-primary/50",
+              "relative rounded-md overflow-hidden border-2 transition-all hover:border-primary/50",
               image.id === selectedId 
                 ? "border-primary ring-2 ring-primary/20" 
                 : "border-border"
@@ -53,7 +53,7 @@ export function ProductVariantImages({
               />
             </div>
             {image.title && (
-              <span className="absolute bottom-0 left-0 right-0 text-[9px] leading-tight bg-background/90 px-1 py-0.5 truncate text-center">
+              <span className="absolute bottom-0 left-0 right-0 text-[8px] leading-tight bg-background/90 px-1 py-0.5 truncate text-center">
                 {image.title}
               </span>
             )}

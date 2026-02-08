@@ -187,22 +187,20 @@ export default function ProductPage() {
                 )}
               </div>
 
-              {/* CTA Button - Visible */}
-              <div className="lg:fixed lg:bottom-6 lg:right-8 lg:w-[360px] lg:z-40">
-                <div className="space-y-3 rounded-xl border bg-background/95 p-4 shadow-lg">
-                  <Button
-                    variant="cta"
-                    size="xl"
-                    onClick={handleBuyClick}
-                    className="w-full h-12 text-base shadow-lg"
-                  >
-                    <ShoppingCart className="w-5 h-5" />
-                    Comprar en AliExpress
-                  </Button>
-                  <p className="text-xs text-muted-foreground text-center">
-                    Pago 100% seguro - Envio rapido
-                  </p>
-                </div>
+              {/* CTA Button - Under Price */}
+              <div className="space-y-3 rounded-xl border bg-background/95 p-4 shadow-sm">
+                <Button
+                  variant="cta"
+                  size="xl"
+                  onClick={handleBuyClick}
+                  className="w-full h-12 text-base shadow-lg"
+                >
+                  <ShoppingCart className="w-5 h-5" />
+                  Comprar en AliExpress
+                </Button>
+                <p className="text-xs text-muted-foreground text-center">
+                  Pago 100% seguro - Envio rapido
+                </p>
               </div>
               {/* Image Variants Grid (if images have titles) */}
               {product.images && product.images.some(img => img.title) && (
