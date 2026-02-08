@@ -5,11 +5,6 @@ import { ProductImageGallery } from '@/components/product/ProductImageGallery';
 import { ProductVariantImages } from '@/components/product/ProductVariantImages';
 import { ProductOptions } from '@/components/product/ProductOptions';
 import { ProductVariants } from '@/components/product/ProductVariants';
-import { BenefitsSection } from '@/components/landing/BenefitsSection';
-import { VideoGallery } from '@/components/landing/VideoGallery';
-import { ReviewsSection } from '@/components/landing/ReviewsSection';
-import { FAQSection } from '@/components/landing/FAQSection';
-import { TrustSection } from '@/components/landing/TrustSection';
 import { StickyMobileCTA } from '@/components/landing/StickyMobileCTA';
 import { Footer } from '@/components/landing/Footer';
 import { supabase } from '@/integrations/supabase/client';
@@ -242,46 +237,6 @@ export default function ProductPage() {
           </div>
         </div>
       </section>
-
-      {/* Benefits */}
-      {product.benefits && product.benefits.length > 0 && (
-        <BenefitsSection benefits={product.benefits.map(b => ({
-          icon: b.icon,
-          title: b.title,
-          description: b.description,
-        }))} />
-      )}
-
-      {/* Video Gallery */}
-      {product.videos && product.videos.length > 0 && (
-        <VideoGallery videos={product.videos.map(v => ({
-          id: v.id,
-          thumbnail_url: v.thumbnail_url,
-          video_url: v.video_url,
-          title: v.title,
-        }))} />
-      )}
-
-      {/* Reviews */}
-      {product.reviews && product.reviews.length > 0 && (
-        <ReviewsSection reviews={product.reviews.map(r => ({
-          id: r.id,
-          name: r.name,
-          rating: r.rating,
-          comment: r.comment,
-          date_label: r.date_label,
-          is_verified: r.is_verified,
-          avatar_url: r.avatar_url,
-        }))} />
-      )}
-
-      {/* FAQs */}
-      {product.faqs && product.faqs.length > 0 && (
-        <FAQSection faqs={product.faqs} />
-      )}
-
-      {/* Trust Section */}
-      {/* <TrustSection /> */}
 
       {/* Footer */}
       <Footer />
