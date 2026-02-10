@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+﻿import { ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -10,8 +10,10 @@ import {
   X,
   ExternalLink,
   FolderOpen,
-  TextCursorInput,
-  BarChart3
+  BarChart3,
+  Users,
+  AlertTriangle,
+  Settings
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -25,7 +27,9 @@ const navItems = [
   { href: '/admin/productos', label: 'Productos', icon: Package },
   { href: '/admin/productos/nuevo', label: 'Crear producto', icon: Package },
   { href: '/admin/categorias', label: 'Categorías', icon: FolderOpen },
-  { href: '/admin/textos', label: 'Contenido', icon: TextCursorInput },
+  { href: '/admin/usuarios', label: 'Usuarios y roles', icon: Users },
+  { href: '/admin/alertas', label: 'Alertas', icon: AlertTriangle },
+  { href: '/admin/ajustes', label: 'Ajustes', icon: Settings },
   { href: '/admin/analitica', label: 'Analítica', icon: BarChart3 },
 ];
 
@@ -144,3 +148,4 @@ export function AdminLayout({ children }: AdminLayoutProps) {
     </div>
   );
 }
+

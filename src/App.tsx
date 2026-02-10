@@ -1,4 +1,4 @@
-import { Toaster } from "@/components/ui/toaster";
+﻿import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -15,6 +15,8 @@ import AdminCategories from "./pages/admin/AdminCategories";
 import AdminSiteSettings from "./pages/admin/AdminSiteSettings";
 import AdminAnalytics from "./pages/admin/AdminAnalytics";
 import NotFound from "./pages/NotFound";
+import AdminUsers from "./pages/admin/AdminUsers";
+import AdminAlerts from "./pages/admin/AdminAlerts";
 
 const queryClient = new QueryClient();
 
@@ -72,6 +74,22 @@ const App = () => (
               </AdminRoute>
             } />
             
+            <Route path="/admin/usuarios" element={
+              <AdminRoute>
+                <AdminUsers />
+              </AdminRoute>
+            } />
+            <Route path="/admin/alertas" element={
+              <AdminRoute>
+                <AdminAlerts />
+              </AdminRoute>
+            } />
+            <Route path="/admin/ajustes" element={
+              <AdminRoute>
+                <AdminSiteSettings />
+              </AdminRoute>
+            } />
+
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
