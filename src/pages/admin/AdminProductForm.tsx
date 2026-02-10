@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
@@ -65,7 +65,7 @@ function buildPriceString(mode: 'single' | 'range', from: string, to: string): s
   const toClean = to.trim();
   if (mode === 'range') {
     if (!fromClean || !toClean) return '';
-    return `Desde €${fromClean} - €${toClean}`;
+    return `${fromClean}€-${toClean}€`;
   }
   if (!fromClean) return '';
   return `€${fromClean}`;
@@ -470,7 +470,7 @@ export default function AdminProductForm() {
                         <SelectValue placeholder="Selecciona tipo" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="single">Precio �nico</SelectItem>
+                        <SelectItem value="single">Precio �nico</SelectItem>
                         <SelectItem value="range">Rango (desde-hasta)</SelectItem>
                       </SelectContent>
                     </Select>
@@ -1000,6 +1000,7 @@ export default function AdminProductForm() {
     </AdminLayout>
   );
 }
+
 
 
 
