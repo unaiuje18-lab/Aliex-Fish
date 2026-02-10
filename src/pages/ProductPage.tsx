@@ -19,6 +19,8 @@ export default function ProductPage() {
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
   const [selectedImageTitle, setSelectedImageTitle] = useState<string | null>(null);
   const [selectedImagePrice, setSelectedImagePrice] = useState<string | null>(null);
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
+  const [selectedVariantPrice, setSelectedVariantPrice] = useState<string | null>(null);
 
   useEffect(() => {
     if (!product) return;
@@ -28,6 +30,16 @@ export default function ProductPage() {
       product_id: product.id,
     });
   }, [product]);
+
+  useEffect(() => {
+    if (!product?.variants || product.variants.length === 0) return;
+    if (!selectedVariantId) {
+      const first = product.variants[0];
+      setSelectedVariantId(first.id);
+      const priceText = first.price_modifier ? first.price_modifier.trim() : '';
+      setSelectedVariantPrice(priceText ? priceText : null);
+    }
+  }, [product?.variants, selectedVariantId]);
 
   if (isLoading) {
     return (
@@ -67,6 +79,9 @@ export default function ProductPage() {
     );
   }
 
+  const displayPrice = selectedVariantPrice || selectedImagePrice || product.price;
+  const hasCustomPrice = Boolean(selectedVariantPrice || selectedImagePrice);
+
   const handleBuyClick = () => {
     supabase.from('analytics_events').insert({
       event_type: 'affiliate_click',
@@ -77,7 +92,7 @@ export default function ProductPage() {
   };
 
   return (
-    <main className="min-h-screen bg-background">
+    <main className="min-h-screen bg-background pb-24 lg:pb-0">
       {/* Navigation buttons */}
       <div className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
         <div className="container max-w-6xl mx-auto px-4 py-3">
@@ -123,6 +138,37 @@ export default function ProductPage() {
                   setSelectedImagePrice(img?.price || null);
                 }}
               />
+
+              {/* Mobile: Variants under gallery */}
+              <div className="mt-4 space-y-4 lg:hidden">
+                {product.images && product.images.some(img => img.title) && (
+                  <ProductVariantImages
+                    images={product.images}
+                    selectedId={selectedImageId || product.images[0]?.id}
+                    onSelect={(img) => {
+                      setSelectedImageId(img.id);
+                      setSelectedImageTitle(img.title || null);
+                      setSelectedImagePrice(img.price || null);
+                    }}
+                  />
+                )}
+
+                {product.options && product.options.length > 0 && (
+                  <ProductOptions options={product.options} />
+                )}
+
+                {product.variants && product.variants.length > 0 && (
+                  <ProductVariants
+                    variants={product.variants}
+                    selectedId={selectedVariantId}
+                    onSelect={(variant) => {
+                      setSelectedVariantId(variant.id);
+                      const priceText = variant.price_modifier ? variant.price_modifier.trim() : '';
+                      setSelectedVariantPrice(priceText ? priceText : null);
+                    }}
+                  />
+                )}
+              </div>
             </div>
 
             {/* Right - Product Info */}
@@ -160,14 +206,14 @@ export default function ProductPage() {
               <div className="bg-muted/50 p-4 rounded-xl space-y-2">
                 <div className="flex items-baseline gap-3 flex-wrap">
                   <span className="text-3xl md:text-4xl font-bold text-foreground">
-                    {selectedImagePrice || product.price}
+                    {displayPrice}
                   </span>
-                  {!selectedImagePrice && product.original_price && (
+                  {!hasCustomPrice && product.original_price && (
                     <span className="text-lg text-muted-foreground line-through">
                       {product.original_price}
                     </span>
                   )}
-                  {!selectedImagePrice && product.discount && (
+                  {!hasCustomPrice && product.discount && (
                     <span className="text-sm font-medium text-success bg-success/10 px-2 py-1 rounded">
                       Ahorra {product.discount}
                     </span>
@@ -181,8 +227,8 @@ export default function ProductPage() {
                 )}
               </div>
 
-              {/* CTA Button - Under Price */}
-              <div className="space-y-3 rounded-xl border bg-background/95 p-4 shadow-sm">
+              {/* CTA Button - Under Price (desktop only) */}
+              <div className="space-y-3 rounded-xl border bg-background/95 p-4 shadow-sm hidden lg:block">
                 <Button
                   variant="cta"
                   size="xl"
@@ -196,27 +242,42 @@ export default function ProductPage() {
                   Pago 100% seguro - Envio rapido
                 </p>
               </div>
-              {/* Image Variants Grid (if images have titles) */}
+
+              {/* Image Variants Grid (desktop only) */}
               {product.images && product.images.some(img => img.title) && (
-                <ProductVariantImages
-                  images={product.images}
-                  selectedId={selectedImageId || product.images[0]?.id}
-                  onSelect={(img) => {
-                    setSelectedImageId(img.id);
-                    setSelectedImageTitle(img.title || null);
-                    setSelectedImagePrice(img.price || null);
-                  }}
-                />
+                <div className="hidden lg:block">
+                  <ProductVariantImages
+                    images={product.images}
+                    selectedId={selectedImageId || product.images[0]?.id}
+                    onSelect={(img) => {
+                      setSelectedImageId(img.id);
+                      setSelectedImageTitle(img.title || null);
+                      setSelectedImagePrice(img.price || null);
+                    }}
+                  />
+                </div>
               )}
 
-              {/* Options */}
+              {/* Options (desktop only) */}
               {product.options && product.options.length > 0 && (
-                <ProductOptions options={product.options} />
+                <div className="hidden lg:block">
+                  <ProductOptions options={product.options} />
+                </div>
               )}
 
-              {/* Variants */}
+              {/* Variants (desktop only) */}
               {product.variants && product.variants.length > 0 && (
-                <ProductVariants variants={product.variants} />
+                <div className="hidden lg:block">
+                  <ProductVariants
+                    variants={product.variants}
+                    selectedId={selectedVariantId}
+                    onSelect={(variant) => {
+                      setSelectedVariantId(variant.id);
+                      const priceText = variant.price_modifier ? variant.price_modifier.trim() : '';
+                      setSelectedVariantPrice(priceText ? priceText : null);
+                    }}
+                  />
+                </div>
               )}
 
               {/* Trust badges */}
@@ -233,7 +294,8 @@ export default function ProductPage() {
                   <RotateCcw className="w-4 h-4 text-primary" />
                   <span>Garantía incluida</span>
                 </div>
-              </div></div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -243,14 +305,9 @@ export default function ProductPage() {
 
       {/* Sticky Mobile CTA */}
       <StickyMobileCTA
-        price={product.price}
+        price={displayPrice}
         affiliateLink={product.affiliate_link}
       />
     </main>
   );
 }
-
-
-
-
-

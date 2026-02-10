@@ -16,7 +16,8 @@ import {
   useUpdateProductVideos,
   useUpdateProductReviews,
   useUpdateProductFAQs,
-  useUpdateProductImages
+  useUpdateProductImages,
+  useUpdateProductVariants
 } from '@/hooks/useProducts';
 import { useCategories } from '@/hooks/useCategories';
 import { useToast } from '@/hooks/use-toast';
@@ -47,19 +48,23 @@ function parsePrice(raw: string): { mode: 'single' | 'range'; from: string; to: 
   const clean = (raw || '').trim();
   if (!clean) return { mode: 'single', from: '', to: '' };
 
-  const rangeMatch = clean.match(/(\d+(?:[.,]\d{1,2})?)\s*[-–]\s*(\d+(?:[.,]\d{1,2})?)/);
-  if (rangeMatch) {
-    return { mode: 'range', from: rangeMatch[1], to: rangeMatch[2] };
+  const normalized = clean
+    .replace(/desde/gi, '')
+    .replace(/eur/gi, '')
+    .replace(/€+/g, '')
+    .replace(/[–—]/g, '-')
+    .trim();
+
+  const matches = normalized.match(/\d+(?:[.,]\d{1,2})?/g) || [];
+  if (matches.length >= 2) {
+    return { mode: 'range', from: matches[0], to: matches[1] };
+  }
+  if (matches.length === 1) {
+    return { mode: 'single', from: matches[0], to: '' };
   }
 
-  const singleMatch = clean.match(/(\d+(?:[.,]\d{1,2})?)/);
-  if (singleMatch) {
-    return { mode: 'single', from: singleMatch[1], to: '' };
-  }
-
-  return { mode: 'single', from: clean, to: '' };
+  return { mode: 'single', from: normalized, to: '' };
 }
-
 function buildPriceString(mode: 'single' | 'range', from: string, to: string): string {
   const fromClean = from.trim();
   const toClean = to.trim();
@@ -113,6 +118,11 @@ interface FAQForm {
   answer: string;
 }
 
+interface VariantForm {
+  label: string;
+  priceText: string;
+}
+
 export default function AdminProductForm() {
   const { id } = useParams();
   const isEditing = !!id;
@@ -126,6 +136,7 @@ export default function AdminProductForm() {
   const updateVideos = useUpdateProductVideos();
   const updateReviews = useUpdateProductReviews();
   const updateFAQs = useUpdateProductFAQs();
+  const updateVariants = useUpdateProductVariants();
   const updateImages = useUpdateProductImages();
 
   // Basic info
@@ -161,6 +172,7 @@ export default function AdminProductForm() {
   const [videos, setVideos] = useState<VideoForm[]>([]);
   const [reviews, setReviews] = useState<ReviewForm[]>([]);
   const [faqs, setFAQs] = useState<FAQForm[]>([]);
+  const [variants, setVariants] = useState<VariantForm[]>([]);
 
   // Load existing data
   useEffect(() => {
@@ -169,10 +181,23 @@ export default function AdminProductForm() {
       setSlug(existingProduct.slug);
       setSubtitle(existingProduct.subtitle || '');
       setDescription(existingProduct.description || '');
-      const parsedPrice = parsePrice(existingProduct.price);
-      setPriceMode(parsedPrice.mode);
-      setPriceFrom(parsedPrice.from);
-      setPriceTo(parsedPrice.to);
+      const priceMin = existingProduct.price_min;
+      const priceMax = existingProduct.price_max;
+      if (priceMin !== null && priceMax !== null) {
+        setPriceMode('range');
+        setPriceFrom(String(priceMin));
+        setPriceTo(String(priceMax));
+      } else if (priceMin !== null || priceMax !== null) {
+        const onlyPrice = priceMin !== null ? priceMin : priceMax;
+        setPriceMode('single');
+        setPriceFrom(String(onlyPrice));
+        setPriceTo('');
+      } else {
+        const parsedPrice = parsePrice(existingProduct.price);
+        setPriceMode(parsedPrice.mode);
+        setPriceFrom(parsedPrice.from);
+        setPriceTo(parsedPrice.to);
+      }
       setOriginalPrice(existingProduct.original_price || '');
       setDiscount(existingProduct.discount || '');
       setAffiliateLink(existingProduct.affiliate_link);
@@ -223,6 +248,11 @@ export default function AdminProductForm() {
         question: f.question,
         answer: f.answer,
       })));
+
+      setVariants(existingProduct.variants.map(v => ({
+        label: v.variant_label,
+        priceText: v.price_modifier || '',
+      })));
     }
   }, [existingProduct]);
 
@@ -244,7 +274,7 @@ export default function AdminProductForm() {
 
   const isSaving = createProduct.isPending || updateProduct.isPending || 
     updateBenefits.isPending || updateVideos.isPending || 
-    updateReviews.isPending || updateFAQs.isPending || updateImages.isPending;
+    updateReviews.isPending || updateFAQs.isPending || updateImages.isPending || updateVariants.isPending;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -319,6 +349,10 @@ export default function AdminProductForm() {
             productId, 
             faqs: faqs.map((f, i) => ({ ...f, display_order: i })) 
           }),
+          updateVariants.mutateAsync({
+            productId,
+            variants: variants.map((v) => ({ label: v.label, priceText: v.priceText }))
+          }),
         ]);
       }
 
@@ -351,6 +385,8 @@ export default function AdminProductForm() {
   
   const addFAQ = () => setFAQs([...faqs, { question: '', answer: '' }]);
   const removeFAQ = (index: number) => setFAQs(faqs.filter((_, i) => i !== index));
+  const addVariant = () => setVariants([...variants, { label: '', priceText: '' }]);
+  const removeVariant = (index: number) => setVariants(variants.filter((_, i) => i !== index));
 
   if (isEditing && isLoadingProduct) {
     return (
@@ -462,6 +498,62 @@ export default function AdminProductForm() {
                   />
                 </div>
 
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label>Variantes (sin foto)</Label>
+                    <Button type="button" variant="outline" size="sm" onClick={addVariant}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Añadir variante
+                    </Button>
+                  </div>
+                  {variants.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      Añade tamaños o modelos (ej: 1000, 2000, 3000) y su precio si aplica.
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {variants.map((variant, index) => (
+                        <div key={index} className="grid gap-3 md:grid-cols-[1fr_1fr_auto] items-end">
+                          <div className="space-y-2">
+                            <Label htmlFor={`variantLabel-${index}`}>Etiqueta</Label>
+                            <Input
+                              id={`variantLabel-${index}`}
+                              value={variant.label}
+                              onChange={(e) => {
+                                const updated = [...variants];
+                                updated[index].label = e.target.value;
+                                setVariants(updated);
+                              }}
+                              placeholder="1000"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor={`variantPrice-${index}`}>Precio (texto)</Label>
+                            <Input
+                              id={`variantPrice-${index}`}
+                              value={variant.priceText}
+                              onChange={(e) => {
+                                const updated = [...variants];
+                                updated[index].priceText = e.target.value;
+                                setVariants(updated);
+                              }}
+                              placeholder="+5€"
+                            />
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeVariant(index)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <div className="grid gap-4 md:grid-cols-3">
                   <div className="space-y-2">
                     <Label>Tipo de precio</Label>
@@ -1000,6 +1092,9 @@ export default function AdminProductForm() {
     </AdminLayout>
   );
 }
+
+
+
 
 
 

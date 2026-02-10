@@ -1,4 +1,4 @@
-export type AppRole = 'admin' | 'user';
+﻿export type AppRole = 'admin' | 'miembro';
 
 export interface Product {
   id: string;
@@ -129,3 +129,4 @@ export interface AnalyticsEvent {
   product_id: string | null;
   created_at: string;
 }
+

@@ -11,9 +11,12 @@ import ProductPage from "./pages/ProductPage";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminProducts from "./pages/admin/AdminProducts";
 import AdminProductForm from "./pages/admin/AdminProductForm";
+import AdminQuickProduct from "./pages/admin/AdminQuickProduct";
 import AdminCategories from "./pages/admin/AdminCategories";
 import AdminSiteSettings from "./pages/admin/AdminSiteSettings";
 import AdminAnalytics from "./pages/admin/AdminAnalytics";
+import AdminUsers from "./pages/admin/AdminUsers";
+import AdminAlerts from "./pages/admin/AdminAlerts";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,43 +35,63 @@ const App = () => (
             
             {/* Admin routes */}
             <Route path="/admin" element={
-              <AdminRoute>
+              <AdminRoute required="can_dashboard">
                 <AdminDashboard />
               </AdminRoute>
             } />
             <Route path="/admin/productos" element={
-              <AdminRoute>
+              <AdminRoute required="can_products_view">
                 <AdminProducts />
               </AdminRoute>
             } />
             <Route path="/admin/productos/nuevo" element={
-              <AdminRoute>
+              <AdminRoute required="can_products_create">
                 <AdminProductForm />
               </AdminRoute>
             } />
+            <Route path="/admin/productos/importar" element={
+              <AdminRoute required="can_products_create">
+                <AdminQuickProduct />
+              </AdminRoute>
+            } />
             <Route path="/admin/productos/:id" element={
-              <AdminRoute>
+              <AdminRoute required="can_products_edit">
                 <AdminProductForm />
               </AdminRoute>
             } />
             <Route path="/admin/productos/:id/editar" element={
-              <AdminRoute>
+              <AdminRoute required="can_products_edit">
                 <AdminProductForm />
               </AdminRoute>
             } />
             <Route path="/admin/categorias" element={
-              <AdminRoute>
+              <AdminRoute required="can_categories">
                 <AdminCategories />
               </AdminRoute>
             } />
             <Route path="/admin/textos" element={
-              <AdminRoute>
+              <AdminRoute required="can_content">
                 <AdminSiteSettings />
               </AdminRoute>
             } />
             <Route path="/admin/analitica" element={
-              <AdminRoute>
+              <AdminRoute required="can_analytics">
                 <AdminAnalytics />
+              </AdminRoute>
+            } />
+            <Route path="/admin/usuarios" element={
+              <AdminRoute required="can_users">
+                <AdminUsers />
+              </AdminRoute>
+            } />
+            <Route path="/admin/alertas" element={
+              <AdminRoute required="can_alerts">
+                <AdminAlerts />
+              </AdminRoute>
+            } />
+            <Route path="/admin/ajustes" element={
+              <AdminRoute required="can_content">
+                <AdminSiteSettings />
               </AdminRoute>
             } />
             

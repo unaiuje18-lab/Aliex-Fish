@@ -4,12 +4,25 @@ import { ProductVariant } from '@/types/database';
 
 interface ProductVariantsProps {
   variants: ProductVariant[];
+  selectedId?: string | null;
+  onSelect?: (variant: ProductVariant) => void;
 }
 
-export function ProductVariants({ variants }: ProductVariantsProps) {
-  const [selectedVariant, setSelectedVariant] = useState<string | null>(
+export function ProductVariants({ variants, selectedId: selectedIdProp, onSelect }: ProductVariantsProps) {
+  const [internalSelectedId, setInternalSelectedId] = useState<string | null>(
     variants.length > 0 ? variants[0].id : null
   );
+
+  const selectedId = selectedIdProp !== undefined ? selectedIdProp : internalSelectedId;
+
+  const handleSelect = (variant: ProductVariant) => {
+    if (onSelect) {
+      onSelect(variant);
+    }
+    if (selectedIdProp === undefined) {
+      setInternalSelectedId(variant.id);
+    }
+  };
 
   if (variants.length === 0) return null;
 
@@ -18,12 +31,12 @@ export function ProductVariants({ variants }: ProductVariantsProps) {
       <h3 className="font-medium text-sm text-foreground">Variante</h3>
       <div className="flex flex-wrap gap-2">
         {variants.map((variant) => {
-          const isSelected = selectedVariant === variant.id;
+          const isSelected = selectedId === variant.id;
           
           return (
             <button
               key={variant.id}
-              onClick={() => setSelectedVariant(variant.id)}
+              onClick={() => handleSelect(variant)}
               className={cn(
                 "px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all",
                 isSelected 
@@ -44,3 +57,4 @@ export function ProductVariants({ variants }: ProductVariantsProps) {
     </div>
   );
 }
+
