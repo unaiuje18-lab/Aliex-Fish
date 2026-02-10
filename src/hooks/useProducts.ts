@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+﻿import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Product, ProductBenefit, ProductVideo, ProductReview, ProductFAQ, ProductImage, ProductOption, ProductVariant } from '@/types/database';
 
@@ -353,6 +353,33 @@ export function useUpdateProductOptions() {
     },
   });
 }
+// Variants mutations
+export function useUpdateProductVariants() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ productId, variants }: { productId: string; variants: { label: string; priceText?: string }[] }) => {
+      await supabase.from('product_variants').delete().eq('product_id', productId);
+
+      if (variants.length > 0) {
+        const { error } = await supabase
+          .from('product_variants')
+          .insert(variants.map((variant, i) => ({
+            product_id: productId,
+            variant_label: variant.label,
+            price_modifier: variant.priceText || null,
+            display_order: i
+          })));
+
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['product'] });
+    },
+  });
+}
+
 export function useUpdateProductImages() {
   const queryClient = useQueryClient();
 
