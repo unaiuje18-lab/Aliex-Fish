@@ -77,7 +77,7 @@ export default function ProductPage() {
   };
 
   return (
-    <main className="min-h-screen bg-background">
+    <main className="min-h-screen bg-background pb-24 lg:pb-0">
       {/* Navigation buttons */}
       <div className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
         <div className="container max-w-6xl mx-auto px-4 py-3">
@@ -123,6 +123,29 @@ export default function ProductPage() {
                   setSelectedImagePrice(img?.price || null);
                 }}
               />
+
+              {/* Mobile: Variants under gallery */}
+              <div className="mt-4 space-y-4 lg:hidden">
+                {product.images && product.images.some(img => img.title) && (
+                  <ProductVariantImages
+                    images={product.images}
+                    selectedId={selectedImageId || product.images[0]?.id}
+                    onSelect={(img) => {
+                      setSelectedImageId(img.id);
+                      setSelectedImageTitle(img.title || null);
+                      setSelectedImagePrice(img.price || null);
+                    }}
+                  />
+                )}
+
+                {product.options && product.options.length > 0 && (
+                  <ProductOptions options={product.options} />
+                )}
+
+                {product.variants && product.variants.length > 0 && (
+                  <ProductVariants variants={product.variants} />
+                )}
+              </div>
             </div>
 
             {/* Right - Product Info */}
@@ -181,8 +204,8 @@ export default function ProductPage() {
                 )}
               </div>
 
-              {/* CTA Button - Under Price */}
-              <div className="space-y-3 rounded-xl border bg-background/95 p-4 shadow-sm">
+              {/* CTA Button - Under Price (desktop only) */}
+              <div className="space-y-3 rounded-xl border bg-background/95 p-4 shadow-sm hidden lg:block">
                 <Button
                   variant="cta"
                   size="xl"
@@ -196,27 +219,34 @@ export default function ProductPage() {
                   Pago 100% seguro - Envio rapido
                 </p>
               </div>
-              {/* Image Variants Grid (if images have titles) */}
+
+              {/* Image Variants Grid (desktop only) */}
               {product.images && product.images.some(img => img.title) && (
-                <ProductVariantImages
-                  images={product.images}
-                  selectedId={selectedImageId || product.images[0]?.id}
-                  onSelect={(img) => {
-                    setSelectedImageId(img.id);
-                    setSelectedImageTitle(img.title || null);
-                    setSelectedImagePrice(img.price || null);
-                  }}
-                />
+                <div className="hidden lg:block">
+                  <ProductVariantImages
+                    images={product.images}
+                    selectedId={selectedImageId || product.images[0]?.id}
+                    onSelect={(img) => {
+                      setSelectedImageId(img.id);
+                      setSelectedImageTitle(img.title || null);
+                      setSelectedImagePrice(img.price || null);
+                    }}
+                  />
+                </div>
               )}
 
-              {/* Options */}
+              {/* Options (desktop only) */}
               {product.options && product.options.length > 0 && (
-                <ProductOptions options={product.options} />
+                <div className="hidden lg:block">
+                  <ProductOptions options={product.options} />
+                </div>
               )}
 
-              {/* Variants */}
+              {/* Variants (desktop only) */}
               {product.variants && product.variants.length > 0 && (
-                <ProductVariants variants={product.variants} />
+                <div className="hidden lg:block">
+                  <ProductVariants variants={product.variants} />
+                </div>
               )}
 
               {/* Trust badges */}
@@ -233,7 +263,8 @@ export default function ProductPage() {
                   <RotateCcw className="w-4 h-4 text-primary" />
                   <span>Garantía incluida</span>
                 </div>
-              </div></div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -243,14 +274,9 @@ export default function ProductPage() {
 
       {/* Sticky Mobile CTA */}
       <StickyMobileCTA
-        price={product.price}
+        price={selectedImagePrice || product.price}
         affiliateLink={product.affiliate_link}
       />
     </main>
   );
 }
-
-
-
-
-
