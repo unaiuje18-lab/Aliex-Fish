@@ -47,19 +47,23 @@ function parsePrice(raw: string): { mode: 'single' | 'range'; from: string; to: 
   const clean = (raw || '').trim();
   if (!clean) return { mode: 'single', from: '', to: '' };
 
-  const rangeMatch = clean.match(/(\d+(?:[.,]\d{1,2})?)\s*[-–]\s*(\d+(?:[.,]\d{1,2})?)/);
-  if (rangeMatch) {
-    return { mode: 'range', from: rangeMatch[1], to: rangeMatch[2] };
+  const normalized = clean
+    .replace(/desde/gi, '')
+    .replace(/eur/gi, '')
+    .replace(/€+/g, '')
+    .replace(/[–—]/g, '-')
+    .trim();
+
+  const matches = normalized.match(/\d+(?:[.,]\d{1,2})?/g) || [];
+  if (matches.length >= 2) {
+    return { mode: 'range', from: matches[0], to: matches[1] };
+  }
+  if (matches.length === 1) {
+    return { mode: 'single', from: matches[0], to: '' };
   }
 
-  const singleMatch = clean.match(/(\d+(?:[.,]\d{1,2})?)/);
-  if (singleMatch) {
-    return { mode: 'single', from: singleMatch[1], to: '' };
-  }
-
-  return { mode: 'single', from: clean, to: '' };
+  return { mode: 'single', from: normalized, to: '' };
 }
-
 function buildPriceString(mode: 'single' | 'range', from: string, to: string): string {
   const fromClean = from.trim();
   const toClean = to.trim();
@@ -169,10 +173,23 @@ export default function AdminProductForm() {
       setSlug(existingProduct.slug);
       setSubtitle(existingProduct.subtitle || '');
       setDescription(existingProduct.description || '');
-      const parsedPrice = parsePrice(existingProduct.price);
-      setPriceMode(parsedPrice.mode);
-      setPriceFrom(parsedPrice.from);
-      setPriceTo(parsedPrice.to);
+      const priceMin = existingProduct.price_min;
+      const priceMax = existingProduct.price_max;
+      if (priceMin !== null && priceMax !== null) {
+        setPriceMode('range');
+        setPriceFrom(String(priceMin));
+        setPriceTo(String(priceMax));
+      } else if (priceMin !== null || priceMax !== null) {
+        const onlyPrice = priceMin !== null ? priceMin : priceMax;
+        setPriceMode('single');
+        setPriceFrom(String(onlyPrice));
+        setPriceTo('');
+      } else {
+        const parsedPrice = parsePrice(existingProduct.price);
+        setPriceMode(parsedPrice.mode);
+        setPriceFrom(parsedPrice.from);
+        setPriceTo(parsedPrice.to);
+      }
       setOriginalPrice(existingProduct.original_price || '');
       setDiscount(existingProduct.discount || '');
       setAffiliateLink(existingProduct.affiliate_link);
@@ -1000,6 +1017,7 @@ export default function AdminProductForm() {
     </AdminLayout>
   );
 }
+
 
 
 
