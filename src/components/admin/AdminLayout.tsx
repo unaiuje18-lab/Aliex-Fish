@@ -13,7 +13,8 @@ import {
   BarChart3,
   Users,
   AlertTriangle,
-  Settings
+  Settings,
+  Link2
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -26,6 +27,7 @@ const navItems = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/productos', label: 'Productos', icon: Package },
   { href: '/admin/productos/nuevo', label: 'Crear producto', icon: Package },
+  { href: '/admin/productos/importar', label: 'Importar por link', icon: Link2 },
   { href: '/admin/categorias', label: 'Categorías', icon: FolderOpen },
   { href: '/admin/usuarios', label: 'Usuarios y roles', icon: Users },
   { href: '/admin/alertas', label: 'Alertas', icon: AlertTriangle },
@@ -54,6 +56,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       case '/admin/productos':
         return permissions.can_products_view;
       case '/admin/productos/nuevo':
+        return permissions.can_products_create;
+      case '/admin/productos/importar':
         return permissions.can_products_create;
       case '/admin/categorias':
         return permissions.can_categories;

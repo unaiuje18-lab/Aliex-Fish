@@ -44,9 +44,29 @@ Deno.serve(async (req) => {
       .eq('role', 'admin')
       .maybeSingle();
 
-    if (roleError || !roleData) {
+    if (roleError) {
       return new Response(
-        JSON.stringify({ success: false, error: 'Admin access required' }),
+        JSON.stringify({ success: false, error: 'Permission check failed' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const isAdmin = !!roleData;
+
+    if (!isAdmin) {
+      const { data: permData, error: permError } = await supabase
+        .from('user_permissions')
+        .select('can_products_create')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (permError || !permData?.can_products_create) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Admin access required' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

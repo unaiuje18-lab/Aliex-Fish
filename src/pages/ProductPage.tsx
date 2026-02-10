@@ -19,6 +19,8 @@ export default function ProductPage() {
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
   const [selectedImageTitle, setSelectedImageTitle] = useState<string | null>(null);
   const [selectedImagePrice, setSelectedImagePrice] = useState<string | null>(null);
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
+  const [selectedVariantPrice, setSelectedVariantPrice] = useState<string | null>(null);
 
   useEffect(() => {
     if (!product) return;
@@ -28,6 +30,16 @@ export default function ProductPage() {
       product_id: product.id,
     });
   }, [product]);
+
+  useEffect(() => {
+    if (!product?.variants || product.variants.length === 0) return;
+    if (!selectedVariantId) {
+      const first = product.variants[0];
+      setSelectedVariantId(first.id);
+      const priceText = first.price_modifier ? first.price_modifier.trim() : '';
+      setSelectedVariantPrice(priceText ? priceText : null);
+    }
+  }, [product?.variants, selectedVariantId]);
 
   if (isLoading) {
     return (
@@ -66,6 +78,9 @@ export default function ProductPage() {
       </main>
     );
   }
+
+  const displayPrice = selectedVariantPrice || selectedImagePrice || product.price;
+  const hasCustomPrice = Boolean(selectedVariantPrice || selectedImagePrice);
 
   const handleBuyClick = () => {
     supabase.from('analytics_events').insert({
@@ -143,7 +158,15 @@ export default function ProductPage() {
                 )}
 
                 {product.variants && product.variants.length > 0 && (
-                  <ProductVariants variants={product.variants} />
+                  <ProductVariants
+                    variants={product.variants}
+                    selectedId={selectedVariantId}
+                    onSelect={(variant) => {
+                      setSelectedVariantId(variant.id);
+                      const priceText = variant.price_modifier ? variant.price_modifier.trim() : '';
+                      setSelectedVariantPrice(priceText ? priceText : null);
+                    }}
+                  />
                 )}
               </div>
             </div>
@@ -183,14 +206,14 @@ export default function ProductPage() {
               <div className="bg-muted/50 p-4 rounded-xl space-y-2">
                 <div className="flex items-baseline gap-3 flex-wrap">
                   <span className="text-3xl md:text-4xl font-bold text-foreground">
-                    {selectedImagePrice || product.price}
+                    {displayPrice}
                   </span>
-                  {!selectedImagePrice && product.original_price && (
+                  {!hasCustomPrice && product.original_price && (
                     <span className="text-lg text-muted-foreground line-through">
                       {product.original_price}
                     </span>
                   )}
-                  {!selectedImagePrice && product.discount && (
+                  {!hasCustomPrice && product.discount && (
                     <span className="text-sm font-medium text-success bg-success/10 px-2 py-1 rounded">
                       Ahorra {product.discount}
                     </span>
@@ -245,7 +268,15 @@ export default function ProductPage() {
               {/* Variants (desktop only) */}
               {product.variants && product.variants.length > 0 && (
                 <div className="hidden lg:block">
-                  <ProductVariants variants={product.variants} />
+                  <ProductVariants
+                    variants={product.variants}
+                    selectedId={selectedVariantId}
+                    onSelect={(variant) => {
+                      setSelectedVariantId(variant.id);
+                      const priceText = variant.price_modifier ? variant.price_modifier.trim() : '';
+                      setSelectedVariantPrice(priceText ? priceText : null);
+                    }}
+                  />
                 </div>
               )}
 
@@ -274,7 +305,7 @@ export default function ProductPage() {
 
       {/* Sticky Mobile CTA */}
       <StickyMobileCTA
-        price={selectedImagePrice || product.price}
+        price={displayPrice}
         affiliateLink={product.affiliate_link}
       />
     </main>
