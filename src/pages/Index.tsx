@@ -1,4 +1,4 @@
-import { Link, useSearchParams } from 'react-router-dom';
+﻿import { Link, useSearchParams } from 'react-router-dom';
 import { useEffect } from 'react';
 import { usePublishedProducts } from '@/hooks/useProducts';
 import { useCategories } from '@/hooks/useCategories';
@@ -18,7 +18,7 @@ const Index = () => {
   
   const { data: products, isLoading } = usePublishedProducts();
   const { data: categories, isLoading: categoriesLoading } = useCategories();
-  const { isAdmin, user } = useAuth();
+  const { isAdmin, user, canAccessAdmin } = useAuth();
   const { data: siteSettings } = useSiteSettings();
   const { data: socialLinks } = useSiteSocialLinks();
 
@@ -49,7 +49,7 @@ const Index = () => {
             🎣 AliexFISH
           </Link>
           <div className="flex items-center gap-3">
-            {isAdmin && (
+            {(isAdmin || canAccessAdmin) && (
               <Button variant="outline" size="sm" asChild>
                 <Link to="/admin">
                   <Settings className="h-4 w-4 mr-2" />
@@ -223,7 +223,7 @@ const Index = () => {
               <p className="text-muted-foreground mb-6">
                 Los productos aparecerán aquí cuando sean publicados.
               </p>
-              {isAdmin && (
+              {(isAdmin || canAccessAdmin) && (
                 <Button asChild>
                   <Link to="/admin/productos/nuevo">Crear tu primer producto</Link>
                 </Button>
@@ -260,6 +260,7 @@ const Index = () => {
 };
 
 export default Index;
+
 
 
 

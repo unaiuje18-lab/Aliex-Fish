@@ -1,4 +1,4 @@
-﻿import { useMemo } from 'react';
+import { useMemo } from 'react';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useQuery } from '@tanstack/react-query';
@@ -14,7 +14,6 @@ interface AlertProduct {
   price_max: number | null;
   main_image_url: string | null;
   category: string | null;
-  orders_count: number | null;
 }
 
 export default function AdminAlerts() {
@@ -23,7 +22,7 @@ export default function AdminAlerts() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('products')
-        .select('id,title,slug,price,price_min,price_max,main_image_url,category,orders_count')
+        .select('id,title,slug,price,price_min,price_max,main_image_url,category')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -40,13 +39,11 @@ export default function AdminAlerts() {
 
     const noImage = products.filter((p) => !p.main_image_url);
     const noCategory = products.filter((p) => !p.category || p.category.trim().length === 0);
-    const noStock = products.filter((p) => !p.orders_count || p.orders_count === 0);
 
     return {
       noPrice,
       noImage,
       noCategory,
-      noStock,
     };
   }, [products]);
 
@@ -92,24 +89,6 @@ export default function AdminAlerts() {
                   <p className="text-muted-foreground">Todo OK.</p>
                 ) : (
                   alerts.noImage.map((p) => (
-                    <Link key={p.id} to={`/admin/productos/${p.id}`} className="block text-sm text-primary">
-                      {p.title}
-                    </Link>
-                  ))
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Sin stock ({alerts.noStock.length})</CardTitle>
-                <CardDescription>Productos con pedidos en 0.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {alerts.noStock.length === 0 ? (
-                  <p className="text-muted-foreground">Todo OK.</p>
-                ) : (
-                  alerts.noStock.map((p) => (
                     <Link key={p.id} to={`/admin/productos/${p.id}`} className="block text-sm text-primary">
                       {p.title}
                     </Link>

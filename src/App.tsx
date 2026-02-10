@@ -1,4 +1,4 @@
-﻿import { Toaster } from "@/components/ui/toaster";
+import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -14,9 +14,9 @@ import AdminProductForm from "./pages/admin/AdminProductForm";
 import AdminCategories from "./pages/admin/AdminCategories";
 import AdminSiteSettings from "./pages/admin/AdminSiteSettings";
 import AdminAnalytics from "./pages/admin/AdminAnalytics";
-import NotFound from "./pages/NotFound";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminAlerts from "./pages/admin/AdminAlerts";
+import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
@@ -34,62 +34,61 @@ const App = () => (
             
             {/* Admin routes */}
             <Route path="/admin" element={
-              <AdminRoute>
+              <AdminRoute required="can_dashboard">
                 <AdminDashboard />
               </AdminRoute>
             } />
             <Route path="/admin/productos" element={
-              <AdminRoute>
+              <AdminRoute required="can_products_view">
                 <AdminProducts />
               </AdminRoute>
             } />
             <Route path="/admin/productos/nuevo" element={
-              <AdminRoute>
+              <AdminRoute required="can_products_create">
                 <AdminProductForm />
               </AdminRoute>
             } />
             <Route path="/admin/productos/:id" element={
-              <AdminRoute>
+              <AdminRoute required="can_products_edit">
                 <AdminProductForm />
               </AdminRoute>
             } />
             <Route path="/admin/productos/:id/editar" element={
-              <AdminRoute>
+              <AdminRoute required="can_products_edit">
                 <AdminProductForm />
               </AdminRoute>
             } />
             <Route path="/admin/categorias" element={
-              <AdminRoute>
+              <AdminRoute required="can_categories">
                 <AdminCategories />
               </AdminRoute>
             } />
             <Route path="/admin/textos" element={
-              <AdminRoute>
+              <AdminRoute required="can_content">
                 <AdminSiteSettings />
               </AdminRoute>
             } />
             <Route path="/admin/analitica" element={
-              <AdminRoute>
+              <AdminRoute required="can_analytics">
                 <AdminAnalytics />
               </AdminRoute>
             } />
-            
             <Route path="/admin/usuarios" element={
-              <AdminRoute>
+              <AdminRoute required="can_users">
                 <AdminUsers />
               </AdminRoute>
             } />
             <Route path="/admin/alertas" element={
-              <AdminRoute>
+              <AdminRoute required="can_alerts">
                 <AdminAlerts />
               </AdminRoute>
             } />
             <Route path="/admin/ajustes" element={
-              <AdminRoute>
+              <AdminRoute required="can_content">
                 <AdminSiteSettings />
               </AdminRoute>
             } />
-
+            
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

@@ -1,11 +1,11 @@
-﻿import { ReactNode } from 'react';
+import { ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { 
-  LayoutDashboard, 
-  Package, 
-  LogOut, 
+import {
+  LayoutDashboard,
+  Package,
+  LogOut,
   Menu,
   X,
   ExternalLink,
@@ -34,7 +34,7 @@ const navItems = [
 ];
 
 export function AdminLayout({ children }: AdminLayoutProps) {
-  const { user, signOut } = useAuth();
+  const { user, signOut, isAdmin, permissions, canAccessAdmin } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -43,6 +43,36 @@ export function AdminLayout({ children }: AdminLayoutProps) {
     await signOut();
     navigate('/auth');
   };
+
+  const canSeeItem = (href: string) => {
+    if (isAdmin) return true;
+    if (!canAccessAdmin || !permissions) return false;
+
+    switch (href) {
+      case '/admin':
+        return permissions.can_dashboard;
+      case '/admin/productos':
+        return permissions.can_products_view;
+      case '/admin/productos/nuevo':
+        return permissions.can_products_create;
+      case '/admin/categorias':
+        return permissions.can_categories;
+      case '/admin/textos':
+        return permissions.can_content;
+      case '/admin/ajustes':
+        return permissions.can_content;
+      case '/admin/analitica':
+        return permissions.can_analytics;
+      case '/admin/alertas':
+        return permissions.can_alerts;
+      case '/admin/usuarios':
+        return permissions.can_users;
+      default:
+        return false;
+    }
+  };
+
+  const visibleItems = navItems.filter((item) => canSeeItem(item.href));
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -61,7 +91,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
-        <div 
+        <div
           className="lg:hidden fixed inset-0 z-50 bg-black/50"
           onClick={() => setSidebarOpen(false)}
         />
@@ -88,10 +118,10 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
           {/* Navigation */}
           <nav className="flex-1 p-4 space-y-1">
-            {navItems.map((item) => {
-              const isActive = location.pathname === item.href || 
+            {visibleItems.map((item) => {
+              const isActive = location.pathname === item.href ||
                 (item.href !== '/admin' && location.pathname.startsWith(item.href));
-              
+
               return (
                 <Link
                   key={item.href}
@@ -99,8 +129,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                   onClick={() => setSidebarOpen(false)}
                   className={cn(
                     "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                    isActive 
-                      ? "bg-primary text-primary-foreground" 
+                    isActive
+                      ? "bg-primary text-primary-foreground"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
                   )}
                 >
@@ -121,11 +151,11 @@ export function AdminLayout({ children }: AdminLayoutProps) {
               <ExternalLink className="h-4 w-4" />
               Ver tienda
             </Link>
-            
+
             <div className="px-3 py-2 text-xs text-muted-foreground truncate">
               {user?.email}
             </div>
-            
+
             <Button
               variant="outline"
               size="sm"
@@ -148,4 +178,3 @@ export function AdminLayout({ children }: AdminLayoutProps) {
     </div>
   );
 }
-
