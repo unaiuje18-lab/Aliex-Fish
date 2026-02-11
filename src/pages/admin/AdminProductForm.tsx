@@ -119,7 +119,6 @@ interface FAQForm {
 }
 
 interface VariantForm {
-  group: string;
   label: string;
   priceText: string;
 }
@@ -251,7 +250,6 @@ export default function AdminProductForm() {
       })));
 
       setVariants(existingProduct.variants.map(v => ({
-        group: v.group_title || 'General',
         label: v.variant_label,
         priceText: v.price_modifier || '',
       })));
@@ -353,7 +351,7 @@ export default function AdminProductForm() {
           }),
           updateVariants.mutateAsync({
             productId,
-            variants: variants.map((v) => ({ group: v.group, label: v.label, priceText: v.priceText }))
+            variants: variants.map((v) => ({ label: v.label, priceText: v.priceText }))
           }),
         ]);
       }
@@ -387,7 +385,7 @@ export default function AdminProductForm() {
   
   const addFAQ = () => setFAQs([...faqs, { question: '', answer: '' }]);
   const removeFAQ = (index: number) => setFAQs(faqs.filter((_, i) => i !== index));
-  const addVariant = () => setVariants([...variants, { group: 'General', label: '', priceText: '' }]);
+  const addVariant = () => setVariants([...variants, { label: '', priceText: '' }]);
   const removeVariant = (index: number) => setVariants(variants.filter((_, i) => i !== index));
 
   if (isEditing && isLoadingProduct) {
@@ -516,20 +514,7 @@ export default function AdminProductForm() {
                   ) : (
                     <div className="space-y-3">
                       {variants.map((variant, index) => (
-                        <div key={index} className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto] items-end">
-                          <div className="space-y-2">
-                            <Label htmlFor={`variantGroup-${index}`}>Grupo</Label>
-                            <Input
-                              id={`variantGroup-${index}`}
-                              value={variant.group}
-                              onChange={(e) => {
-                                const updated = [...variants];
-                                updated[index].group = e.target.value;
-                                setVariants(updated);
-                              }}
-                              placeholder="Color"
-                            />
-                          </div>
+                        <div key={index} className="grid gap-3 md:grid-cols-[1fr_1fr_auto] items-end">
                           <div className="space-y-2">
                             <Label htmlFor={`variantLabel-${index}`}>Etiqueta</Label>
                             <Input
@@ -540,7 +525,7 @@ export default function AdminProductForm() {
                                 updated[index].label = e.target.value;
                                 setVariants(updated);
                               }}
-                              placeholder="Rojo"
+                              placeholder="1000"
                             />
                           </div>
                           <div className="space-y-2">
@@ -1107,8 +1092,6 @@ export default function AdminProductForm() {
     </AdminLayout>
   );
 }
-
-
 
 
 

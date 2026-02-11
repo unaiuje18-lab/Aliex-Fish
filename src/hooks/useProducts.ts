@@ -358,7 +358,7 @@ export function useUpdateProductVariants() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ productId, variants }: { productId: string; variants: { group: string; label: string; priceText?: string }[] }) => {
+    mutationFn: async ({ productId, variants }: { productId: string; variants: { label: string; priceText?: string }[] }) => {
       await supabase.from('product_variants').delete().eq('product_id', productId);
 
       if (variants.length > 0) {
@@ -366,7 +366,6 @@ export function useUpdateProductVariants() {
           .from('product_variants')
           .insert(variants.map((variant, i) => ({
             product_id: productId,
-            group_title: variant.group || 'General',
             variant_label: variant.label,
             price_modifier: variant.priceText || null,
             display_order: i
@@ -407,5 +406,4 @@ export function useUpdateProductImages() {
     },
   });
 }
-
 
