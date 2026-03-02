@@ -4,6 +4,7 @@ import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -11,12 +12,11 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useCreateProduct, useUpdateProductBenefits, useUpdateProductReviews, useUpdateProductImages, useUpdateProductOptions } from '@/hooks/useProducts';
 import { useCategories } from '@/hooks/useCategories';
-import { ArrowLeft, Loader2, Zap, Link as LinkIcon, Check, AlertCircle, ImageIcon } from 'lucide-react';
+import { ArrowLeft, Loader2, Zap, Link as LinkIcon, Check, AlertCircle, ImageIcon, Pencil } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ImageSelector } from '@/components/admin/ImageSelector';
 
-// Default benefits based on category slug
 const DEFAULT_BENEFITS: Record<string, { icon: string; title: string; description: string }[]> = {
   canas: [
     { icon: 'Zap', title: 'Alta Sensibilidad', description: 'Detecta hasta el pique más suave' },
@@ -50,8 +50,7 @@ const DEFAULT_BENEFITS: Record<string, { icon: string; title: string; descriptio
   ],
 };
 
-// Generate fake reviews
-function generateReviews(productTitle: string): { name: string; rating: number; comment: string; date_label: string; is_verified: boolean }[] {
+function generateReviews(productTitle: string) {
   const names = ['Carlos M.', 'Antonio L.', 'María P.', 'José R.', 'Pedro S.', 'Ana G.', 'Luis F.', 'Carmen D.'];
   const comments = [
     `Excelente ${productTitle.split(' ').slice(0, 2).join(' ').toLowerCase()}, mejor de lo esperado. Muy recomendable.`,
@@ -61,10 +60,8 @@ function generateReviews(productTitle: string): { name: string; rating: number; 
     'Superó mis expectativas. El material se siente muy resistente.',
   ];
   const dates = ['Hace 2 días', 'Hace 1 semana', 'Hace 2 semanas', 'Hace 3 días', 'Hace 5 días'];
-
-  const numReviews = Math.floor(Math.random() * 3) + 3; // 3-5 reviews
+  const numReviews = Math.floor(Math.random() * 3) + 3;
   const reviews = [];
-
   for (let i = 0; i < numReviews; i++) {
     reviews.push({
       name: names[Math.floor(Math.random() * names.length)],
@@ -74,7 +71,6 @@ function generateReviews(productTitle: string): { name: string; rating: number; 
       is_verified: Math.random() > 0.2,
     });
   }
-
   return reviews;
 }
 
@@ -107,8 +103,6 @@ export default function AdminQuickProduct() {
   const updateReviews = useUpdateProductReviews();
   const updateImages = useUpdateProductImages();
   const updateOptions = useUpdateProductOptions();
-
-  // Categories from database
   const { data: categories } = useCategories();
 
   const [aliexpressUrl, setAliexpressUrl] = useState('');
@@ -118,25 +112,24 @@ export default function AdminQuickProduct() {
   const [scrapedData, setScrapedData] = useState<ScrapedData | null>(null);
   const [error, setError] = useState('');
   const scrapeTimer = useRef<number | null>(null);
-  
-  // Image selection state
+
+  // Editable fields
+  const [editTitle, setEditTitle] = useState('');
+  const [editPrice, setEditPrice] = useState('');
+  const [editOriginalPrice, setEditOriginalPrice] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+
+  // Image selection
   const [showImageSelector, setShowImageSelector] = useState(false);
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
 
   const handleScrape = async (requestedUrl?: string) => {
     const targetUrl = (requestedUrl || aliexpressUrl).trim();
     if (!targetUrl) {
-      toast({
-        variant: 'destructive',
-        title: 'URL requerida',
-        description: 'Por favor pega el link de AliExpress',
-      });
+      toast({ variant: 'destructive', title: 'URL requerida', description: 'Por favor pega el link de AliExpress' });
       return;
     }
-
-    if (targetUrl === aliexpressUrl.trim() && isScraping) {
-      return;
-    }
+    if (targetUrl === aliexpressUrl.trim() && isScraping) return;
 
     setIsScraping(true);
     setError('');
@@ -148,9 +141,7 @@ export default function AdminQuickProduct() {
       let fnError: any;
 
       try {
-        const res = await supabase.functions.invoke('import-product', {
-          body: { url: targetUrl },
-        });
+        const res = await supabase.functions.invoke('import-product', { body: { url: targetUrl } });
         data = res.data;
         fnError = res.error;
       } catch (err: any) {
@@ -158,113 +149,80 @@ export default function AdminQuickProduct() {
       }
 
       if (fnError && String(fnError.message || fnError).includes('Failed to send a request')) {
-        // Fallback to legacy scraper if new function isn't reachable
-        const fallback = await supabase.functions.invoke('scrape-aliexpress', {
-          body: { url: targetUrl },
-        });
+        const fallback = await supabase.functions.invoke('scrape-aliexpress', { body: { url: targetUrl } });
         data = fallback.data;
         fnError = fallback.error;
-        if (!fnError) {
-          toast({
-            title: 'Usando modo compatible',
-            description: 'No se pudo contactar import-product. Despliega la función para el modo completo.',
-          });
-        }
       }
 
-      if (fnError) {
-        throw new Error(fnError.message);
-      }
+      if (fnError) throw new Error(fnError.message);
+      if (!data.success) throw new Error(data.error || 'No se pudo extraer la información');
 
-      if (!data.success) {
-        throw new Error(data.error || 'No se pudo extraer la información');
-      }
+      const scraped = data.data as ScrapedData;
+      setScrapedData(scraped);
 
-      setScrapedData(data.data);
-      
-      // If there are multiple images, show selector
-      if (data.data.images && data.data.images.length > 1) {
-        setSelectedImages(data.data.images);
+      // Populate editable fields
+      setEditTitle(scraped.title || '');
+      setEditPrice(scraped.price || '');
+      setEditOriginalPrice(scraped.originalPrice || '');
+      setEditDescription(scraped.description || '');
+
+      if (scraped.images?.length > 1) {
+        setSelectedImages(scraped.images);
         setShowImageSelector(true);
       } else {
-        setSelectedImages(data.data.images || []);
+        setSelectedImages(scraped.images || []);
       }
-      
-      toast({
-        title: '¡Datos extraídos!',
-        description: `Se encontraron ${data.data.images?.length || 0} imágenes`,
-      });
+
+      toast({ title: '¡Datos extraídos!', description: `${scraped.images?.length || 0} imágenes encontradas` });
     } catch (err: any) {
       console.error('Scrape error:', err);
-      setError(err.message || 'Error al extraer datos. Intenta de nuevo.');
-      toast({
-        variant: 'destructive',
-        title: 'Error al extraer',
-        description: err.message || 'No se pudo obtener la información del producto',
-      });
+      setError(err.message || 'Error al extraer datos');
+      toast({ variant: 'destructive', title: 'Error al extraer', description: err.message });
     } finally {
       setIsScraping(false);
     }
   };
 
   useEffect(() => {
-    if (scrapeTimer.current) {
-      window.clearTimeout(scrapeTimer.current);
-    }
-
+    if (scrapeTimer.current) window.clearTimeout(scrapeTimer.current);
     const targetUrl = aliexpressUrl.trim();
     if (!targetUrl) return;
-
-    scrapeTimer.current = window.setTimeout(() => {
-      handleScrape(targetUrl);
-    }, 700);
-
-    return () => {
-      if (scrapeTimer.current) {
-        window.clearTimeout(scrapeTimer.current);
-      }
-    };
+    scrapeTimer.current = window.setTimeout(() => handleScrape(targetUrl), 700);
+    return () => { if (scrapeTimer.current) window.clearTimeout(scrapeTimer.current); };
   }, [aliexpressUrl]);
 
   const handleImageSelection = (images: string[]) => {
     setSelectedImages(images);
     setShowImageSelector(false);
-    toast({
-      title: 'Imágenes seleccionadas',
-      description: `${images.length} imágenes listas para importar`,
-    });
+    toast({ title: 'Imágenes seleccionadas', description: `${images.length} imágenes listas` });
+  };
+
+  const generateSlug = (title: string) => {
+    return title
+      .toLowerCase()
+      .normalize('NFD').replace(/[\\u0300-\\u036f]/g, '')
+      .replace(/[^a-z0-9\\s-]/g, '')
+      .replace(/\\s+/g, '-')
+      .replace(/-+/g, '-')
+      .substring(0, 80) || `producto-${Date.now()}`;
   };
 
   const handleCreateProduct = async () => {
-    if (!scrapedData) {
-      toast({
-        variant: 'destructive',
-        title: 'Sin datos',
-        description: 'Primero extrae los datos del link de AliExpress',
-      });
-      return;
-    }
-
+    if (!scrapedData) return;
     if (selectedImages.length === 0) {
-      toast({
-        variant: 'destructive',
-        title: 'Sin imágenes',
-        description: 'Selecciona al menos una imagen para el producto',
-      });
+      toast({ variant: 'destructive', title: 'Sin imágenes', description: 'Selecciona al menos una imagen' });
       return;
     }
 
     setIsLoading(true);
-
     try {
-      // Create the product
       const productData = {
-        title: scrapedData.title,
-        slug: scrapedData.slug,
+        title: editTitle || scrapedData.title,
+        slug: generateSlug(editTitle || scrapedData.title),
         subtitle: scrapedData.subtitle || null,
-        description: scrapedData.description || null,
-        price: scrapedData.price,
-        original_price: scrapedData.originalPrice || null,
+        description: editDescription || scrapedData.description || null,
+        price: editPrice || scrapedData.price,
+        original_price: editOriginalPrice || scrapedData.originalPrice || null,
         discount: scrapedData.discount || null,
         affiliate_link: scrapedData.affiliateLink,
         aliexpress_url: scrapedData.aliexpressUrl || null,
@@ -285,7 +243,6 @@ export default function AdminQuickProduct() {
       const newProduct = await createProduct.mutateAsync(productData);
 
       if (newProduct?.id) {
-        // Save all selected images
         await updateImages.mutateAsync({
           productId: newProduct.id,
           images: selectedImages.map(url => ({ url, title: '', price: '' })),
@@ -293,46 +250,29 @@ export default function AdminQuickProduct() {
 
         if (scrapedData.variants?.length) {
           const flatOptions = scrapedData.variants.flatMap(group =>
-            group.options.map(opt => ({
-              group: group.group,
-              label: opt.label,
-              imageUrl: opt.imageUrl
-            }))
+            group.options.map(opt => ({ group: group.group, label: opt.label, imageUrl: opt.imageUrl }))
           );
-          await updateOptions.mutateAsync({
-            productId: newProduct.id,
-            options: flatOptions,
-          });
+          await updateOptions.mutateAsync({ productId: newProduct.id, options: flatOptions });
         }
-        
-        // Add default benefits based on category
+
         const benefitsData = DEFAULT_BENEFITS[category] || DEFAULT_BENEFITS.default;
         await updateBenefits.mutateAsync({
           productId: newProduct.id,
           benefits: benefitsData.map((b, i) => ({ ...b, display_order: i })),
         });
 
-        // Add generated reviews
-        const reviewsData = generateReviews(scrapedData.title);
+        const reviewsData = generateReviews(editTitle || scrapedData.title);
         await updateReviews.mutateAsync({
           productId: newProduct.id,
           reviews: reviewsData.map(r => ({ ...r, avatar_url: null })),
         });
       }
 
-      toast({
-        title: '¡Producto creado!',
-        description: `Con ${selectedImages.length} imágenes. Edítalo para publicarlo.`,
-      });
-
+      toast({ title: '¡Producto creado!', description: `Con ${selectedImages.length} imágenes. Edítalo para publicarlo.` });
       navigate(`/admin/productos/${newProduct?.id}`);
     } catch (err: any) {
       console.error('Create error:', err);
-      toast({
-        variant: 'destructive',
-        title: 'Error al crear',
-        description: err.message || 'No se pudo crear el producto',
-      });
+      toast({ variant: 'destructive', title: 'Error al crear', description: err.message });
     } finally {
       setIsLoading(false);
     }
@@ -344,17 +284,15 @@ export default function AdminQuickProduct() {
         {/* Header */}
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" asChild>
-            <Link to="/admin/productos">
-              <ArrowLeft className="h-5 w-5" />
-            </Link>
+            <Link to="/admin/productos"><ArrowLeft className="h-5 w-5" /></Link>
           </Button>
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
               <Zap className="h-6 w-6 text-primary" />
-              Producto Rápido
+              Importar Producto
             </h1>
             <p className="text-sm text-muted-foreground">
-              Pega un link de AliExpress y creamos el producto automáticamente
+              Pega un link de AliExpress y edita los datos antes de crear
             </p>
           </div>
         </div>
@@ -364,37 +302,25 @@ export default function AdminQuickProduct() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-sm font-bold">1</span>
-              Pega el Link de AliExpress
+              Pega el Link
             </CardTitle>
-            <CardDescription>
-              Copia el link del producto desde AliExpress
-            </CardDescription>
+            <CardDescription>Link de producto o de afiliado de AliExpress</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent>
             <div className="flex gap-2">
-              <div className="flex-1">
-                <Input
-                  value={aliexpressUrl}
-                  onChange={(e) => setAliexpressUrl(e.target.value)}
-                  placeholder="https://es.aliexpress.com/item/..."
-                  className="w-full"
-                />
-              </div>
-              <Button 
-                onClick={() => handleScrape()} 
-                disabled={isScraping || !aliexpressUrl.trim()}
-              >
-                {isScraping ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <LinkIcon className="h-4 w-4" />
-                )}
+              <Input
+                value={aliexpressUrl}
+                onChange={(e) => setAliexpressUrl(e.target.value)}
+                placeholder="https://es.aliexpress.com/item/... o link de afiliado"
+                className="flex-1"
+              />
+              <Button onClick={() => handleScrape()} disabled={isScraping || !aliexpressUrl.trim()}>
+                {isScraping ? <Loader2 className="h-4 w-4 animate-spin" /> : <LinkIcon className="h-4 w-4" />}
                 <span className="ml-2 hidden sm:inline">Extraer</span>
               </Button>
             </div>
-
             {error && (
-              <Alert variant="destructive">
+              <Alert variant="destructive" className="mt-4">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
@@ -402,141 +328,127 @@ export default function AdminQuickProduct() {
           </CardContent>
         </Card>
 
-        {/* Step 2: Category Selection */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-sm font-bold">2</span>
-              Selecciona la Categoría
-            </CardTitle>
-            <CardDescription>
-              Esto añadirá beneficios predefinidos según el tipo de producto
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Selecciona categoría" />
-              </SelectTrigger>
-              <SelectContent>
-                {categories?.map((cat) => (
-                  <SelectItem key={cat.id} value={cat.slug}>
-                    {cat.icon} {cat.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </CardContent>
-        </Card>
-
-        {/* Step 3: Preview & Create */}
+        {/* Step 2: Editable Preview */}
         {scrapedData && (
           <Card className="border-primary">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-sm font-bold">3</span>
-                Vista Previa
+                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-sm font-bold">2</span>
+                <Pencil className="h-4 w-4" />
+                Edita los datos
               </CardTitle>
-              <CardDescription>
-                Revisa los datos extraídos
-              </CardDescription>
+              <CardDescription>Modifica título, precio y descripción antes de crear</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Main image preview */}
               <div className="flex gap-4">
                 {selectedImages[0] && (
                   <img
                     src={selectedImages[0]}
                     alt="Producto"
-                    className="w-24 h-24 object-cover rounded-lg border"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                    }}
+                    className="w-28 h-28 object-cover rounded-lg border flex-shrink-0"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
                   />
                 )}
-                <div className="flex-1 space-y-2">
-                  <h3 className="font-semibold line-clamp-2">{scrapedData.title}</h3>
-                  <div className="flex flex-wrap items-center gap-3">
-                    {scrapedData.priceRange ? (
-                      <span className="text-xl font-bold text-primary">{scrapedData.priceRange}</span>
-                    ) : (
-                      <span className="text-xl font-bold text-primary">{scrapedData.price}</span>
-                    )}
-                    {scrapedData.originalPrice && (
-                      <span className="text-sm text-muted-foreground line-through">
-                        {scrapedData.originalPrice}
-                      </span>
-                    )}
-                    {scrapedData.discount && (
-                      <span className="text-xs bg-destructive text-destructive-foreground px-2 py-0.5 rounded">
-                        {scrapedData.discount}
-                      </span>
-                    )}
+                <div className="flex-1 space-y-3">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Título</Label>
+                    <Input
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      placeholder="Título del producto"
+                    />
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span>⭐ {scrapedData.rating.toFixed(1)}</span>
-                    <span>•</span>
-                    <span>{scrapedData.reviewCount} ventas</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Precio</Label>
+                      <Input
+                        value={editPrice}
+                        onChange={(e) => setEditPrice(e.target.value)}
+                        placeholder="€12.99"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Precio original</Label>
+                      <Input
+                        value={editOriginalPrice}
+                        onChange={(e) => setEditOriginalPrice(e.target.value)}
+                        placeholder="€24.99 (opcional)"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Image count and selector button */}
+              {/* Description */}
+              <div>
+                <Label className="text-xs text-muted-foreground">Descripción</Label>
+                <Textarea
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  placeholder="Descripción del producto (opcional)"
+                  rows={3}
+                />
+              </div>
+
+              {/* Category */}
+              <div>
+                <Label className="text-xs text-muted-foreground">Categoría</Label>
+                <Select value={category} onValueChange={setCategory}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Selecciona categoría" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories?.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.slug}>
+                        {cat.icon} {cat.name}
+                      </SelectItem>
+                    ))
+                  }</SelectContent>
+                </Select>
+              </div>
+
+              {/* Image count */}
               <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                 <div className="flex items-center gap-2">
                   <ImageIcon className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm">
                     <strong>{selectedImages.length}</strong> imágenes seleccionadas
                     {scrapedData.images.length > selectedImages.length && (
-                      <span className="text-muted-foreground">
-                        {' '}de {scrapedData.images.length} disponibles
-                      </span>
+                      <span className="text-muted-foreground"> de {scrapedData.images.length} disponibles</span>
                     )}
                   </span>
                 </div>
                 {scrapedData.images.length > 0 && (
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => setShowImageSelector(true)}
-                  >
+                  <Button variant="outline" size="sm" onClick={() => setShowImageSelector(true)}>
                     Editar selección
                   </Button>
                 )}
               </div>
 
-              <div className="pt-4 border-t">
-                <Label className="text-xs text-muted-foreground mb-2 block">
-                  Se añadirán automáticamente:
-                </Label>
+              {/* Auto-added info */}
+              <div className="pt-3 border-t">
+                <Label className="text-xs text-muted-foreground mb-2 block">Se añadirán automáticamente:</Label>
                 <div className="flex flex-wrap gap-2">
                   <span className="text-xs bg-secondary px-2 py-1 rounded">
                     ✅ {(DEFAULT_BENEFITS[category] || DEFAULT_BENEFITS.default).length} beneficios
                   </span>
-                  <span className="text-xs bg-secondary px-2 py-1 rounded">
-                    ⭐ 3-5 reseñas
-                  </span>
-                  <span className="text-xs bg-secondary px-2 py-1 rounded">
-                    📁 Categoría: {categories?.find(c => c.slug === category)?.icon} {categories?.find(c => c.slug === category)?.name}
-                  </span>
+                  <span className="text-xs bg-secondary px-2 py-1 rounded">⭐ 3-5 reseñas</span>
                 </div>
               </div>
 
-              <Button 
-                onClick={handleCreateProduct} 
-                className="w-full" 
+              <Button
+                onClick={handleCreateProduct}
+                className="w-full"
                 size="lg"
                 disabled={isLoading || selectedImages.length === 0}
               >
-                {isLoading ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Check className="h-4 w-4 mr-2" />
-                )}
-                Crear Producto con {selectedImages.length} imágenes
+                {isLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Check className="h-4 w-4 mr-2" />}
+                Crear Producto
               </Button>
 
               <p className="text-xs text-center text-muted-foreground">
-                El producto se creará como borrador. Podrás editarlo antes de publicar.
+                Se creará como borrador. Podrás editarlo antes de publicar.
               </p>
             </CardContent>
           </Card>
@@ -547,12 +459,9 @@ export default function AdminQuickProduct() {
       <Dialog open={showImageSelector} onOpenChange={setShowImageSelector}>
         <DialogContent className="max-w-3xl max-h-[90vh]">
           <DialogHeader>
-            <DialogTitle>Seleccionar imágenes a importar</DialogTitle>
-            <DialogDescription>
-              Elige qué imágenes quieres usar para este producto. La primera será la imagen principal.
-            </DialogDescription>
+            <DialogTitle>Seleccionar imágenes</DialogTitle>
+            <DialogDescription>Elige las imágenes para este producto. La primera será la principal.</DialogDescription>
           </DialogHeader>
-          
           {scrapedData && (
             <ImageSelector
               images={scrapedData.images}
