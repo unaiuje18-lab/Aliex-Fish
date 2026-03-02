@@ -1,4 +1,4 @@
-﻿export type AppRole = 'admin' | 'miembro';
+export type AppRole = 'admin' | 'user';
 
 export interface Product {
   id: string;
@@ -96,6 +96,22 @@ export interface ProductVariant {
   price_modifier: string | null;
   display_order: number;
   created_at: string;
+}
+
+export interface UserPermission {
+  id: string;
+  user_id: string;
+  can_dashboard: boolean;
+  can_products_view: boolean;
+  can_products_create: boolean;
+  can_products_edit: boolean;
+  can_categories: boolean;
+  can_content: boolean;
+  can_analytics: boolean;
+  can_alerts: boolean;
+  can_users: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface UserRole {
