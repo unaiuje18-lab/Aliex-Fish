@@ -35,62 +35,62 @@ const App = () => (
             
             {/* Admin routes */}
             <Route path="/admin" element={
-              <AdminRoute required="can_dashboard">
+              <AdminRoute>
                 <AdminDashboard />
               </AdminRoute>
             } />
             <Route path="/admin/productos" element={
-              <AdminRoute required="can_products_view">
+              <AdminRoute>
                 <AdminProducts />
               </AdminRoute>
             } />
             <Route path="/admin/productos/nuevo" element={
-              <AdminRoute required="can_products_create">
+              <AdminRoute>
                 <AdminProductForm />
               </AdminRoute>
             } />
             <Route path="/admin/productos/importar" element={
-              <AdminRoute required="can_products_create">
+              <AdminRoute>
                 <AdminQuickProduct />
               </AdminRoute>
             } />
             <Route path="/admin/productos/:id" element={
-              <AdminRoute required="can_products_edit">
+              <AdminRoute>
                 <AdminProductForm />
               </AdminRoute>
             } />
             <Route path="/admin/productos/:id/editar" element={
-              <AdminRoute required="can_products_edit">
+              <AdminRoute>
                 <AdminProductForm />
               </AdminRoute>
             } />
             <Route path="/admin/categorias" element={
-              <AdminRoute required="can_categories">
+              <AdminRoute>
                 <AdminCategories />
               </AdminRoute>
             } />
             <Route path="/admin/textos" element={
-              <AdminRoute required="can_content">
+              <AdminRoute>
                 <AdminSiteSettings />
               </AdminRoute>
             } />
             <Route path="/admin/analitica" element={
-              <AdminRoute required="can_analytics">
+              <AdminRoute>
                 <AdminAnalytics />
               </AdminRoute>
             } />
             <Route path="/admin/usuarios" element={
-              <AdminRoute required="can_users">
+              <AdminRoute>
                 <AdminUsers />
               </AdminRoute>
             } />
             <Route path="/admin/alertas" element={
-              <AdminRoute required="can_alerts">
+              <AdminRoute>
                 <AdminAlerts />
               </AdminRoute>
             } />
             <Route path="/admin/ajustes" element={
-              <AdminRoute required="can_content">
+              <AdminRoute>
                 <AdminSiteSettings />
               </AdminRoute>
             } />

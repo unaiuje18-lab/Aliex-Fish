@@ -36,7 +36,7 @@ const navItems = [
 ];
 
 export function AdminLayout({ children }: AdminLayoutProps) {
-  const { user, signOut, isAdmin, permissions, canAccessAdmin } = useAuth();
+  const { user, signOut, isAdmin, canAccessAdmin } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -46,34 +46,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
     navigate('/auth');
   };
 
-  const canSeeItem = (href: string) => {
-    if (isAdmin) return true;
-    if (!canAccessAdmin || !permissions) return false;
-
-    switch (href) {
-      case '/admin':
-        return permissions.can_dashboard;
-      case '/admin/productos':
-        return permissions.can_products_view;
-      case '/admin/productos/nuevo':
-        return permissions.can_products_create;
-      case '/admin/productos/importar':
-        return permissions.can_products_create;
-      case '/admin/categorias':
-        return permissions.can_categories;
-      case '/admin/textos':
-        return permissions.can_content;
-      case '/admin/ajustes':
-        return permissions.can_content;
-      case '/admin/analitica':
-        return permissions.can_analytics;
-      case '/admin/alertas':
-        return permissions.can_alerts;
-      case '/admin/usuarios':
-        return permissions.can_users;
-      default:
-        return false;
-    }
+  const canSeeItem = (_href: string) => {
+    return isAdmin;
   };
 
   const visibleItems = navItems.filter((item) => canSeeItem(item.href));
