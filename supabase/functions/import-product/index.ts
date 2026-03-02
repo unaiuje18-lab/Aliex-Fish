@@ -17,37 +17,42 @@ Deno.serve(async (req) => {
       );
     }
 
-    const apiKey = Deno.env.get('FIRECRAWL_API_KEY');
-    if (!apiKey) {
+    const { scrapeUrl, productId, originalInputUrl } = await resolveAliExpressUrl(url);
+    console.log('Resolved URL:', scrapeUrl, '| Product ID:', productId);
+
+    if (!productId) {
       return new Response(
-        JSON.stringify({ success: false, error: 'Firecrawl not configured' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ success: false, error: 'No se pudo detectar el ID del producto en el link.' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Resolve URL
-    const { scrapeUrl, mobileUrl, originalInputUrl } = await resolveAliExpressUrl(url);
-    console.log('Scraping:', scrapeUrl);
+    // Strategy 1: Direct HTML fetch (fast, no Firecrawl needed)
+    let productData = await tryDirectFetch(scrapeUrl, originalInputUrl);
 
-    // Try desktop first, then mobile as fallback
-    let result = await scrapeWithFirecrawl(scrapeUrl, apiKey);
-    let productData = result.ok ? parseAliExpressData(result, originalInputUrl, scrapeUrl) : null;
-
-    // If desktop failed or got no data, try mobile URL (lighter page)
-    if ((!productData?.title || productData.images.length === 0) && mobileUrl) {
+    // Strategy 2: Try mobile URL
+    if (!productData?.title || productData.images.length === 0) {
+      const mobileUrl = `https://m.aliexpress.com/item/${productId}.html`;
       console.log('Trying mobile URL:', mobileUrl);
-      const mobileResult = await scrapeWithFirecrawl(mobileUrl, apiKey);
-      if (mobileResult.ok) {
-        const mobileData = parseAliExpressData(mobileResult, originalInputUrl, mobileUrl);
-        if (mobileData.title && mobileData.images.length > 0) {
-          productData = mobileData;
+      productData = await tryDirectFetch(mobileUrl, originalInputUrl) || productData;
+    }
+
+    // Strategy 3: Firecrawl as last resort (only mobile, lighter page)
+    if (!productData?.title || productData.images.length === 0) {
+      const apiKey = Deno.env.get('FIRECRAWL_API_KEY');
+      if (apiKey) {
+        const mobileUrl = `https://m.aliexpress.com/item/${productId}.html`;
+        console.log('Trying Firecrawl on mobile:', mobileUrl);
+        const fcData = await tryFirecrawl(mobileUrl, apiKey);
+        if (fcData) {
+          productData = parseFromHtml(fcData.html, fcData.markdown, originalInputUrl, mobileUrl);
         }
       }
     }
 
     if (!productData?.title || productData.images.length === 0) {
       return new Response(
-        JSON.stringify({ success: false, error: 'No se pudo extraer datos del producto. Verifica que el link sea correcto.' }),
+        JSON.stringify({ success: false, error: 'No se pudo extraer datos. AliExpress puede estar bloqueando el acceso. Inténtalo de nuevo en unos minutos.' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -68,36 +73,71 @@ Deno.serve(async (req) => {
   }
 });
 
-// ===== Firecrawl scrape - LIGHTWEIGHT, no actions =====
-async function scrapeWithFirecrawl(targetUrl: string, apiKey: string) {
-  const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      url: targetUrl,
-      formats: ['markdown', 'html', 'links'],
-      onlyMainContent: false,
-      waitFor: 3000,
-      timeout: 30000,
-    }),
-  });
+// ===== Strategy 1: Direct fetch (fastest) =====
+async function tryDirectFetch(targetUrl: string, affiliateUrl: string) {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
 
-  const data = await response.json();
-  if (!response.ok) {
-    console.error('Firecrawl error:', data);
-    return { ok: false as const, error: data.error || 'Scrape failed' };
+    const res = await fetch(targetUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml',
+        'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+      },
+      redirect: 'follow',
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+
+    const html = await res.text();
+    console.log('Direct fetch HTML length:', html.length);
+
+    if (html.includes('captcha') && html.length < 5000) {
+      console.log('Got captcha page, skipping direct fetch');
+      return null;
+    }
+
+    return parseFromHtml(html, '', affiliateUrl, targetUrl);
+  } catch (e) {
+    console.log('Direct fetch failed:', e);
+    return null;
   }
+}
 
-  return {
-    ok: true as const,
-    markdown: data.data?.markdown || data.markdown || '',
-    html: data.data?.html || data.data?.rawHtml || data.html || '',
-    links: data.data?.links || data.links || [],
-    metadata: data.data?.metadata || data.metadata || {},
-  };
+// ===== Strategy 3: Firecrawl (fallback) =====
+async function tryFirecrawl(targetUrl: string, apiKey: string) {
+  try {
+    const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        url: targetUrl,
+        formats: ['html', 'markdown'],
+        onlyMainContent: false,
+        waitFor: 2000,
+        timeout: 20000,
+      }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      console.error('Firecrawl error:', data);
+      return null;
+    }
+
+    return {
+      html: data.data?.html || data.data?.rawHtml || data.html || '',
+      markdown: data.data?.markdown || data.markdown || '',
+      metadata: data.data?.metadata || data.metadata || {},
+    };
+  } catch (e) {
+    console.error('Firecrawl failed:', e);
+    return null;
+  }
 }
 
 // ===== URL resolution =====
@@ -106,31 +146,54 @@ async function resolveAliExpressUrl(url: string) {
   if (!formattedUrl.startsWith('http')) formattedUrl = `https://${formattedUrl}`;
   const originalInputUrl = formattedUrl;
 
+  // Check if it's already a product URL
+  let productId = extractProductId(formattedUrl);
+  if (productId) {
+    return { scrapeUrl: `https://www.aliexpress.com/item/${productId}.html`, productId, originalInputUrl };
+  }
+
   // Resolve short/affiliate links
-  const isShortLink = /s\.click\.aliexpress|a\.aliexpress|aliexpress\.ru\/\w+/i.test(formattedUrl);
+  const isShortLink = /s\.click\.aliexpress|a\.aliexpress|aliexpress\.ru\/\w+|aliexpress\.com\/e\//i.test(formattedUrl);
   if (isShortLink) {
+    console.log('Resolving short link:', formattedUrl);
     try {
-      const res = await fetch(formattedUrl, { method: 'HEAD', redirect: 'follow' });
-      if (res.url && res.url !== formattedUrl) formattedUrl = res.url;
-    } catch {
-      try {
-        const res = await fetch(formattedUrl, { redirect: 'follow' });
-        const body = await res.text();
-        const productId = extractProductId(body) || extractProductId(res.url);
-        if (productId) formattedUrl = `https://www.aliexpress.com/item/${productId}.html`;
-        else if (res.url !== formattedUrl) formattedUrl = res.url;
-      } catch { /* keep original */ }
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      const res = await fetch(formattedUrl, {
+        method: 'GET',
+        redirect: 'follow',
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      // Check final URL
+      productId = extractProductId(res.url);
+      if (productId) {
+        return { scrapeUrl: `https://www.aliexpress.com/item/${productId}.html`, productId, originalInputUrl };
+      }
+
+      // Check body for product ID or redirect
+      const body = await res.text();
+      productId = extractProductId(body);
+      if (productId) {
+        return { scrapeUrl: `https://www.aliexpress.com/item/${productId}.html`, productId, originalInputUrl };
+      }
+
+      // Try meta refresh
+      const metaUrl = body.match(/url=["']?([^"'\s>]+)/i)?.[1];
+      if (metaUrl) {
+        productId = extractProductId(metaUrl);
+        if (productId) {
+          return { scrapeUrl: `https://www.aliexpress.com/item/${productId}.html`, productId, originalInputUrl };
+        }
+      }
+    } catch (e) {
+      console.log('Short link resolution failed:', e);
     }
   }
 
-  // Strip query params
-  try { formattedUrl = new URL(formattedUrl).origin + new URL(formattedUrl).pathname; } catch {}
-
-  const productId = extractProductId(formattedUrl);
-  const scrapeUrl = productId ? `https://www.aliexpress.com/item/${productId}.html` : formattedUrl;
-  const mobileUrl = productId ? `https://m.aliexpress.com/item/${productId}.html` : '';
-
-  return { scrapeUrl, mobileUrl, originalInputUrl };
+  return { scrapeUrl: formattedUrl, productId: null, originalInputUrl };
 }
 
 function extractProductId(text: string): string | null {
@@ -140,26 +203,21 @@ function extractProductId(text: string): string | null {
 }
 
 // ===== Parsing =====
-type ScrapeResult = { ok: true; markdown: string; html: string; links: string[]; metadata: Record<string, unknown> };
-
-function parseAliExpressData(source: ScrapeResult, affiliateUrl: string, canonicalUrl: string) {
-  const { markdown, html, metadata } = source;
-  const title = extractTitle(markdown, html, metadata);
-  const { price, originalPrice, priceRange } = extractPrices(markdown, metadata);
+function parseFromHtml(html: string, markdown: string, affiliateUrl: string, canonicalUrl: string) {
+  const title = extractTitle(html, markdown);
   const images = extractImages(html, markdown);
-  const description = extractDescription(markdown, metadata);
+  const { price, originalPrice } = extractPrices(html, markdown);
+  const description = extractDescription(html);
   const slug = generateSlug(title);
 
-  const finalPrice = price || '0.00';
-
   return {
-    title: title || '',
-    subtitle: ((metadata.description as string) || '').substring(0, 100),
+    title,
+    subtitle: description.substring(0, 100),
     description,
-    price: `€${finalPrice}`,
+    price: price ? `€${price}` : '€0.00',
     originalPrice: originalPrice || '',
-    priceRange: priceRange || '',
-    discount: originalPrice && price ? calculateDiscount(`€${finalPrice}`, originalPrice) : '',
+    priceRange: '',
+    discount: originalPrice && price ? calculateDiscount(`€${price}`, originalPrice) : '',
     images,
     rating: 4.5,
     reviewCount: 0,
@@ -174,39 +232,74 @@ function parseAliExpressData(source: ScrapeResult, affiliateUrl: string, canonic
   };
 }
 
-function extractTitle(markdown: string, html: string, metadata: Record<string, unknown>): string {
-  let title = (metadata.title as string) || '';
-  if (!title && html) {
-    const og = html.match(/<meta[^>]+property=["']og:title["'][^>]*content=["']([^"']+)["']/i);
-    if (og?.[1]) title = og[1].trim();
+function extractTitle(html: string, markdown: string): string {
+  // og:title
+  let title = html.match(/<meta[^>]+property=["']og:title["'][^>]*content=["']([^"']+)["']/i)?.[1]?.trim() || '';
+  // twitter:title
+  if (!title) title = html.match(/<meta[^>]+name=["']twitter:title["'][^>]*content=["']([^"']+)["']/i)?.[1]?.trim() || '';
+  // <title>
+  if (!title) title = html.match(/<title>([^<]+)<\/title>/i)?.[1]?.trim() || '';
+  // JSON-LD
+  if (!title) {
+    const jsonLd = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
+    if (jsonLd) {
+      for (const script of jsonLd) {
+        const content = script.replace(/<\/?script[^>]*>/gi, '');
+        try {
+          const parsed = JSON.parse(content);
+          if (parsed.name) { title = parsed.name; break; }
+        } catch {}
+      }
+    }
   }
-  if (!title && html) {
-    const t = html.match(/<title>([^<]+)<\/title>/i);
-    if (t?.[1]) title = t[1].trim();
+  // Markdown heading
+  if (!title && markdown) {
+    title = markdown.match(/^#\s+(.+)$/m)?.[1]?.trim() || '';
   }
+
+  // Clean AliExpress suffixes
   title = title.replace(/\s*[-|–]\s*(AliExpress|Aliexpress).*$/i, '').trim();
   title = title.replace(/^\d+(\.\d+)?%?\s*OFF\s*/i, '').trim();
   title = title.replace(/Comprar\s+/i, '').trim();
-  if (!title && markdown) {
-    const h = markdown.match(/^#\s+(.+)$/m);
-    if (h) title = h[1].trim();
-  }
+
+  // Skip if it's a captcha/error page
+  if (/captcha|recaptcha|verify|robot/i.test(title)) return '';
+
   return title.substring(0, 120);
 }
 
-function extractDescription(markdown: string, metadata: Record<string, unknown>): string {
-  const meta = (metadata.description as string) || '';
-  if (meta) return meta.substring(0, 800);
-  if (!markdown) return '';
-  const line = markdown.split('\n').map(l => l.trim()).filter(Boolean).find(l => l.length > 40 && !l.startsWith('#'));
-  return (line || '').substring(0, 800);
+function extractDescription(html: string): string {
+  const desc = html.match(/<meta[^>]+(?:name|property)=["'](?:og:)?description["'][^>]*content=["']([^"']+)["']/i)?.[1]?.trim() || '';
+  return desc.substring(0, 800);
 }
 
-function extractPrices(markdown: string, metadata: Record<string, unknown>) {
-  const content = markdown + ' ' + ((metadata.description as string) || '') + ' ' + ((metadata.title as string) || '');
-  const patterns = [/€\s*(\d+(?:[.,]\d{1,2})?)/g, /(\d+(?:[.,]\d{1,2})?)\s*€/g, /US\s*\$\s*(\d+(?:[.,]\d{1,2})?)/gi, /\$\s*(\d+(?:[.,]\d{1,2})?)/g];
-  const prices: number[] = [];
+function extractPrices(html: string, markdown: string) {
+  const content = html + ' ' + markdown;
 
+  // Try JSON-LD price first (most reliable)
+  const jsonLd = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
+  if (jsonLd) {
+    for (const script of jsonLd) {
+      const c = script.replace(/<\/?script[^>]*>/gi, '');
+      try {
+        const parsed = JSON.parse(c);
+        const offer = parsed.offers || parsed;
+        if (offer.price || offer.lowPrice) {
+          const price = String(offer.price || offer.lowPrice);
+          const highPrice = offer.highPrice ? `€${offer.highPrice}` : '';
+          return { price, originalPrice: highPrice };
+        }
+      } catch {}
+    }
+  }
+
+  // Try meta tags
+  const metaPrice = html.match(/product:price:amount["'][^>]*content=["']([^"']+)["']/i)?.[1];
+  if (metaPrice) return { price: metaPrice, originalPrice: '' };
+
+  // Regex fallback
+  const patterns = [/€\s*(\d+(?:[.,]\d{1,2})?)/g, /(\d+(?:[.,]\d{1,2})?)\s*€/g, /US\s*\$\s*(\d+(?:[.,]\d{1,2})?)/gi];
+  const prices: number[] = [];
   for (const p of patterns) {
     p.lastIndex = 0;
     let m;
@@ -214,16 +307,15 @@ function extractPrices(markdown: string, metadata: Record<string, unknown>) {
       const v = parseFloat(m[1].replace(',', '.'));
       if (v > 0 && v < 10000) prices.push(v);
     }
-    if (prices.length > 0) break; // Use first currency found
+    if (prices.length > 0) break;
   }
 
-  if (prices.length === 0) return { price: '', originalPrice: '', priceRange: '' };
+  if (prices.length === 0) return { price: '', originalPrice: '' };
   prices.sort((a, b) => a - b);
   const lo = prices[0], hi = prices[prices.length - 1];
   return {
     price: lo.toFixed(2),
     originalPrice: hi > lo * 1.5 ? `€${hi.toFixed(2)}` : '',
-    priceRange: prices.length > 1 && hi > lo * 1.2 ? `Desde €${lo.toFixed(2)}` : '',
   };
 }
 
@@ -231,28 +323,44 @@ function extractImages(html: string, markdown: string): string[] {
   const images = new Set<string>();
   const content = html + ' ' + markdown;
 
-  // alicdn URLs
+  // og:image first
+  const ogImg = html.match(/<meta[^>]+property=["']og:image["'][^>]*content=["']([^"']+)["']/i)?.[1];
+  if (ogImg && ogImg.includes('alicdn')) images.add(cleanImageUrl(ogImg));
+
+  // JSON-LD images
+  const jsonLd = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
+  if (jsonLd) {
+    for (const script of jsonLd) {
+      const c = script.replace(/<\/?script[^>]*>/gi, '');
+      try {
+        const parsed = JSON.parse(c);
+        const imgs = parsed.image ? (Array.isArray(parsed.image) ? parsed.image : [parsed.image]) : [];
+        for (const img of imgs) {
+          const u = typeof img === 'string' ? img : img?.url;
+          if (u && u.includes('alicdn')) images.add(cleanImageUrl(u));
+        }
+      } catch {}
+    }
+  }
+
+  // All alicdn URLs in content
   const pattern = /(?:https?:)?\/\/[a-z0-9.-]*alicdn\.com\/[^\s"'<>)]+/gi;
   let m;
   while ((m = pattern.exec(content)) !== null) {
     let url = m[0].replace(/[,;}\]]+$/, '');
     if (!url.startsWith('http')) url = 'https:' + url;
-    if (url.includes('/kf/') || url.includes('/imgextra/') || /\.(jpg|jpeg|png|webp)/i.test(url)) {
-      if (!url.includes('icon') && !url.includes('logo') && !url.includes('flag') && !url.includes('avatar')) {
-        // Max resolution
-        url = url.replace(/_\d+x\d+\w*\./g, '.').replace(/\.\d+x\d+\./g, '.');
-        images.add(url);
-      }
+    if ((url.includes('/kf/') || url.includes('/imgextra/') || /\.(jpg|jpeg|png|webp)/i.test(url))
+      && !url.includes('icon') && !url.includes('logo') && !url.includes('flag') && !url.includes('avatar')
+      && !url.includes('placeholder')) {
+      images.add(cleanImageUrl(url));
     }
   }
 
-  // og:image
-  if (html) {
-    const og = html.match(/<meta[^>]+property=["']og:image["'][^>]*content=["']([^"']+)["']/i);
-    if (og?.[1] && og[1].includes('alicdn')) images.add(og[1]);
-  }
-
   return [...images].slice(0, 20);
+}
+
+function cleanImageUrl(url: string): string {
+  return url.replace(/_\d+x\d+\w*\./g, '.').replace(/\.\d+x\d+\./g, '.');
 }
 
 function generateSlug(title: string): string {
@@ -269,8 +377,4 @@ function calculateDiscount(currentPrice: string, originalPrice: string): string 
   const original = parseFloat(originalPrice.replace(/[^0-9.,]/g, '').replace(',', '.'));
   if (!current || !original || original <= current) return '';
   return `-${Math.round(((original - current) / original) * 100)}%`;
-}
-
-function containsProductId(url: string): boolean {
-  return /(?:item\/|productId=|itemId=|\/i\/)\d{8,}/i.test(url);
 }
