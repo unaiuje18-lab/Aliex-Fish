@@ -148,12 +148,6 @@ export default function AdminQuickProduct() {
         fnError = err;
       }
 
-      if (fnError && String(fnError.message || fnError).includes('Failed to send a request')) {
-        const fallback = await supabase.functions.invoke('scrape-aliexpress', { body: { url: targetUrl } });
-        data = fallback.data;
-        fnError = fallback.error;
-      }
-
       if (fnError) throw new Error(fnError.message);
       if (!data.success) throw new Error(data.error || 'No se pudo extraer la información');
 
