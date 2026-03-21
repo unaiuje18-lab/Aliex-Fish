@@ -149,7 +149,7 @@ async function tryFirecrawlSearch(
   affiliateUrl: string
 ): Promise<ProductData | null> {
   try {
-    const query = `site:aliexpress.com ${productId}`;
+    const query = `aliexpress ${productId}`;
     console.log('Firecrawl Search query:', query);
 
     const response = await fetch('https://api.firecrawl.dev/v1/search', {
