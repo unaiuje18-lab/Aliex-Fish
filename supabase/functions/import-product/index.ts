@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Auth check - require authenticated admin user
+    // Auth check
     const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
       return new Response(
@@ -58,8 +58,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { scrapeUrl, productId, originalInputUrl } = await resolveAliExpressUrl(url);
-    console.log('Resolved URL:', scrapeUrl, '| Product ID:', productId);
+    const { productId, originalInputUrl } = await resolveAliExpressUrl(url);
+    console.log('Resolved Product ID:', productId);
 
     if (!productId) {
       return new Response(
@@ -68,42 +68,36 @@ Deno.serve(async (req) => {
       );
     }
 
-    let productData: ReturnType<typeof buildProductData> | null = null;
-
-    // Strategy 1: Firecrawl (best results - renders JS)
     const apiKey = Deno.env.get('FIRECRAWL_API_KEY');
-    if (apiKey) {
-      const mobileUrl = `https://m.aliexpress.com/item/${productId}.html`;
-      console.log('Strategy 1: Firecrawl on mobile:', mobileUrl);
-      productData = await tryFirecrawl(mobileUrl, apiKey, originalInputUrl);
-      
-      if (!productData?.title) {
-        console.log('Firecrawl mobile failed, trying desktop');
-        productData = await tryFirecrawl(scrapeUrl, apiKey, originalInputUrl);
-      }
+    if (!apiKey) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Firecrawl no está configurado. Configura el conector en ajustes.' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    // Strategy 2: Direct fetch (fallback - only works if server returns meta tags)
-    if (!productData?.title || productData.images.length === 0) {
-      console.log('Strategy 2: Direct fetch desktop');
-      productData = await tryDirectFetch(scrapeUrl, originalInputUrl) || productData;
+    let productData: ProductData | null = null;
+
+    // Strategy 1: Firecrawl SEARCH (fastest, bypasses anti-bot)
+    console.log('Strategy 1: Firecrawl Search for product', productId);
+    productData = await tryFirecrawlSearch(productId, apiKey, originalInputUrl);
+
+    // Strategy 2: Firecrawl SCRAPE on a less-protected page
+    if (!productData?.title) {
+      console.log('Strategy 2: Firecrawl Scrape on mobile');
+      productData = await tryFirecrawlScrape(
+        `https://m.aliexpress.com/item/${productId}.html`,
+        apiKey,
+        originalInputUrl
+      );
     }
 
     if (!productData?.title || productData.images.length === 0) {
-      console.log('Strategy 2b: Direct fetch mobile');
-      const mobileUrl = `https://m.aliexpress.com/item/${productId}.html`;
-      productData = await tryDirectFetch(mobileUrl, originalInputUrl) || productData;
-    }
-
-    if (!productData?.title || productData.images.length === 0) {
-      console.log('All strategies failed. productData:', JSON.stringify({
-        title: productData?.title || '',
-        imageCount: productData?.images?.length || 0,
-      }));
+      console.log('All strategies failed');
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'No se pudo extraer datos. AliExpress puede estar bloqueando. Inténtalo de nuevo en unos minutos.',
+          error: 'No se pudo extraer datos. AliExpress puede estar bloqueando. Inténtalo de nuevo.',
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -125,14 +119,138 @@ Deno.serve(async (req) => {
   }
 });
 
-// ===== Firecrawl (primary strategy) =====
-async function tryFirecrawl(
+// ===== Types =====
+interface ProductData {
+  title: string;
+  subtitle: string;
+  description: string;
+  price: string;
+  originalPrice: string;
+  priceRange: string;
+  discount: string;
+  images: string[];
+  rating: number;
+  reviewCount: number;
+  ordersCount: number;
+  shippingCost: string;
+  deliveryTime: string;
+  sku: string;
+  variants: { group: string; options: { label: string; imageUrl?: string }[] }[];
+  slug: string;
+  affiliateLink: string;
+  aliexpressUrl: string;
+}
+
+// ===== Strategy 1: Firecrawl Search =====
+// Searches the web for the product, gets data from search results + scraped page
+async function tryFirecrawlSearch(
+  productId: string,
+  apiKey: string,
+  affiliateUrl: string
+): Promise<ProductData | null> {
+  try {
+    const query = `site:aliexpress.com ${productId}`;
+    console.log('Firecrawl Search query:', query);
+
+    const response = await fetch('https://api.firecrawl.dev/v1/search', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query,
+        limit: 3,
+        lang: 'es',
+        scrapeOptions: {
+          formats: ['markdown', 'html'],
+        },
+      }),
+    });
+
+    const result = await response.json();
+    if (!response.ok) {
+      console.error('Firecrawl Search error:', response.status, JSON.stringify(result).substring(0, 500));
+      return null;
+    }
+
+    console.log('Firecrawl Search results:', result.data?.length || 0);
+
+    // Find the best result (the actual product page)
+    const results = result.data || [];
+    let bestTitle = '';
+    let bestDescription = '';
+    let bestImages: string[] = [];
+    let bestPrice = '';
+    let bestOriginalPrice = '';
+    let bestHtml = '';
+    let bestMarkdown = '';
+
+    for (const item of results) {
+      console.log('Search result:', item.url, '| Title:', (item.title || '').substring(0, 60));
+
+      // Get title from search result metadata
+      if (!bestTitle && item.title) {
+        bestTitle = cleanTitle(item.title);
+      }
+      if (!bestDescription && item.description) {
+        bestDescription = item.description;
+      }
+
+      // Parse the scraped content for images and prices
+      const html = item.html || '';
+      const markdown = item.markdown || '';
+      
+      if (html) bestHtml += ' ' + html;
+      if (markdown) bestMarkdown += ' ' + markdown;
+
+      // Extract images from this result
+      const imgs = extractImagesFromContent(html + ' ' + markdown);
+      if (imgs.length > bestImages.length) bestImages = imgs;
+
+      // Extract price
+      const prices = extractPricesFromContent(html + ' ' + markdown);
+      if (prices.price && !bestPrice) {
+        bestPrice = prices.price;
+        bestOriginalPrice = prices.originalPrice;
+      }
+
+      // Also check og:image from metadata
+      const ogImage = item.metadata?.ogImage || item.metadata?.['og:image'];
+      if (ogImage && typeof ogImage === 'string' && ogImage.includes('alicdn')) {
+        bestImages.unshift(cleanImageUrl(ogImage));
+      }
+    }
+
+    // Deduplicate images
+    bestImages = [...new Set(bestImages)];
+
+    if (!bestTitle && !bestImages.length) return null;
+
+    // If we still need more images, try extracting from combined HTML
+    if (bestImages.length < 2 && bestHtml) {
+      const moreImages = extractImagesFromContent(bestHtml);
+      bestImages = [...new Set([...bestImages, ...moreImages])];
+    }
+
+    return buildProductData(
+      bestTitle, bestImages, bestPrice, bestOriginalPrice,
+      bestDescription, affiliateUrl, `https://www.aliexpress.com/item/${productId}.html`
+    );
+  } catch (e) {
+    console.error('Firecrawl Search failed:', e);
+    return null;
+  }
+}
+
+// ===== Strategy 2: Firecrawl Scrape =====
+async function tryFirecrawlScrape(
   targetUrl: string,
   apiKey: string,
   affiliateUrl: string
-): ReturnType<typeof buildProductData> | null {
+): Promise<ProductData | null> {
   try {
-    console.log('Firecrawl request to:', targetUrl);
+    console.log('Firecrawl Scrape:', targetUrl);
     const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
       method: 'POST',
       headers: {
@@ -143,111 +261,67 @@ async function tryFirecrawl(
         url: targetUrl,
         formats: ['html', 'markdown'],
         onlyMainContent: false,
-        waitFor: 5000,
-        timeout: 25000,
+        waitFor: 8000,
+        timeout: 30000,
       }),
     });
 
     const data = await response.json();
     if (!response.ok) {
-      console.error('Firecrawl API error:', response.status, JSON.stringify(data).substring(0, 500));
+      console.error('Firecrawl Scrape error:', response.status);
       return null;
     }
 
-    const html = data.data?.html || data.data?.rawHtml || '';
+    const html = data.data?.html || '';
     const markdown = data.data?.markdown || '';
     const metadata = data.data?.metadata || {};
 
-    console.log('Firecrawl response - HTML length:', html.length, 'Markdown length:', markdown.length);
-    console.log('Firecrawl metadata:', JSON.stringify({
-      title: metadata.title || '',
-      ogImage: metadata.ogImage || metadata['og:image'] || '',
-      description: (metadata.description || '').substring(0, 80),
-    }));
+    console.log('Firecrawl Scrape - HTML:', html.length, 'MD:', markdown.length);
 
-    // Build product data from all sources
-    const title = extractTitle(html, markdown, metadata);
-    const images = extractImages(html, markdown, metadata);
-    const { price, originalPrice } = extractPrices(html, markdown);
-    const description = extractDescription(html, metadata);
-
-    console.log('Firecrawl parsed:', { title: title.substring(0, 50), imageCount: images.length, price });
-
-    if (!title && images.length === 0) return null;
-
-    return buildProductData(title, images, price, originalPrice, description, affiliateUrl, targetUrl);
-  } catch (e) {
-    console.error('Firecrawl failed:', e);
-    return null;
-  }
-}
-
-// ===== Direct fetch (fallback) =====
-async function tryDirectFetch(targetUrl: string, affiliateUrl: string) {
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 12000);
-
-    const res = await fetch(targetUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml',
-        'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
-      },
-      redirect: 'follow',
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
-
-    const html = await res.text();
-    console.log('Direct fetch HTML length:', html.length);
-
-    if (html.includes('captcha') && html.length < 5000) {
-      console.log('Got captcha page, skipping');
-      return null;
+    const title = metadata?.title || metadata?.ogTitle || extractTitleFromContent(html, markdown);
+    const images = extractImagesFromContent(html + ' ' + markdown);
+    const ogImage = metadata?.ogImage;
+    if (ogImage && typeof ogImage === 'string' && ogImage.includes('alicdn')) {
+      images.unshift(cleanImageUrl(ogImage));
     }
+    const { price, originalPrice } = extractPricesFromContent(html + ' ' + markdown);
+    const description = metadata?.description || metadata?.ogDescription || '';
 
-    const title = extractTitle(html, '', {});
-    const images = extractImages(html, '', {});
-    const { price, originalPrice } = extractPrices(html, '');
-    const description = extractDescription(html, {});
+    const cleanedTitle = cleanTitle(title);
+    if (!cleanedTitle && images.length === 0) return null;
 
-    if (!title && images.length === 0) return null;
-
-    return buildProductData(title, images, price, originalPrice, description, affiliateUrl, targetUrl);
+    return buildProductData(
+      cleanedTitle, [...new Set(images)], price, originalPrice,
+      description, affiliateUrl, targetUrl
+    );
   } catch (e) {
-    console.log('Direct fetch failed:', e);
+    console.error('Firecrawl Scrape failed:', e);
     return null;
   }
 }
 
 // ===== Build product data =====
 function buildProductData(
-  title: string,
-  images: string[],
-  price: string,
-  originalPrice: string,
-  description: string,
-  affiliateUrl: string,
-  canonicalUrl: string
-) {
+  title: string, images: string[], price: string, originalPrice: string,
+  description: string, affiliateUrl: string, canonicalUrl: string
+): ProductData {
   const slug = generateSlug(title);
   return {
     title,
     subtitle: description.substring(0, 100),
-    description,
+    description: description.substring(0, 800),
     price: price ? `€${price}` : '€0.00',
     originalPrice: originalPrice || '',
     priceRange: '',
     discount: originalPrice && price ? calculateDiscount(`€${price}`, originalPrice) : '',
-    images,
+    images: images.slice(0, 20),
     rating: 4.5,
     reviewCount: 0,
     ordersCount: 0,
     shippingCost: '',
     deliveryTime: '',
     sku: '',
-    variants: [] as { group: string; options: { label: string; imageUrl?: string }[] }[],
+    variants: [],
     slug: slug || `producto-${Date.now()}`,
     affiliateLink: affiliateUrl,
     aliexpressUrl: canonicalUrl,
@@ -261,9 +335,7 @@ async function resolveAliExpressUrl(url: string) {
   const originalInputUrl = formattedUrl;
 
   let productId = extractProductId(formattedUrl);
-  if (productId) {
-    return { scrapeUrl: `https://www.aliexpress.com/item/${productId}.html`, productId, originalInputUrl };
-  }
+  if (productId) return { productId, originalInputUrl };
 
   // Resolve short/affiliate links
   const isShortLink = /s\.click\.aliexpress|a\.aliexpress|aliexpress\.ru\/\w+|aliexpress\.com\/e\//i.test(formattedUrl);
@@ -281,29 +353,23 @@ async function resolveAliExpressUrl(url: string) {
       clearTimeout(timeout);
 
       productId = extractProductId(res.url);
-      if (productId) {
-        return { scrapeUrl: `https://www.aliexpress.com/item/${productId}.html`, productId, originalInputUrl };
-      }
+      if (productId) return { productId, originalInputUrl };
 
       const body = await res.text();
       productId = extractProductId(body);
-      if (productId) {
-        return { scrapeUrl: `https://www.aliexpress.com/item/${productId}.html`, productId, originalInputUrl };
-      }
+      if (productId) return { productId, originalInputUrl };
 
       const metaUrl = body.match(/url=["']?([^"'\s>]+)/i)?.[1];
       if (metaUrl) {
         productId = extractProductId(metaUrl);
-        if (productId) {
-          return { scrapeUrl: `https://www.aliexpress.com/item/${productId}.html`, productId, originalInputUrl };
-        }
+        if (productId) return { productId, originalInputUrl };
       }
     } catch (e) {
       console.log('Short link resolution failed:', e);
     }
   }
 
-  return { scrapeUrl: formattedUrl, productId: null, originalInputUrl };
+  return { productId: null, originalInputUrl };
 }
 
 function extractProductId(text: string): string | null {
@@ -313,106 +379,138 @@ function extractProductId(text: string): string | null {
 }
 
 // ===== Parsing helpers =====
-function extractTitle(html: string, markdown: string, metadata: Record<string, any>): string {
-  // 1. Firecrawl metadata (most reliable)
-  let title = metadata?.title || metadata?.ogTitle || '';
-  
-  // 2. og:title from HTML
-  if (!title) title = html.match(/<meta[^>]+property=["']og:title["'][^>]*content=["']([^"']+)["']/i)?.[1]?.trim() || '';
-  // Also try reversed attribute order
+function cleanTitle(raw: string): string {
+  if (!raw) return '';
+  let title = raw
+    .replace(/\s*[-|–]\s*(AliExpress|Aliexpress).*$/i, '')
+    .replace(/^\d+(\.\d+)?%?\s*OFF\s*/i, '')
+    .replace(/Comprar\s+/i, '')
+    .replace(/Buy\s+/i, '')
+    .trim();
+  if (/captcha|recaptcha|verify|robot|security/i.test(title)) return '';
+  return title.substring(0, 200);
+}
+
+function extractTitleFromContent(html: string, markdown: string): string {
+  let title = html.match(/<meta[^>]+property=["']og:title["'][^>]*content=["']([^"']+)["']/i)?.[1]?.trim() || '';
   if (!title) title = html.match(/<meta[^>]+content=["']([^"']+)["'][^>]*property=["']og:title["']/i)?.[1]?.trim() || '';
-  
-  // 3. twitter:title
-  if (!title) title = html.match(/<meta[^>]+name=["']twitter:title["'][^>]*content=["']([^"']+)["']/i)?.[1]?.trim() || '';
-  
-  // 4. <title> tag
   if (!title) title = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim() || '';
   
-  // 5. JSON-LD
+  // JSON-LD
   if (!title) {
-    const jsonLdBlocks = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
-    if (jsonLdBlocks) {
-      for (const script of jsonLdBlocks) {
-        const content = script.replace(/<\/?script[^>]*>/gi, '');
+    const jsonLd = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
+    if (jsonLd) {
+      for (const script of jsonLd) {
         try {
-          const parsed = JSON.parse(content);
+          const parsed = JSON.parse(script.replace(/<\/?script[^>]*>/gi, ''));
           if (parsed.name) { title = parsed.name; break; }
-        } catch { /* ignore */ }
+        } catch { /* */ }
       }
     }
   }
-  
-  // 6. Markdown heading
+
+  // AliExpress embedded data
+  if (!title) {
+    title = html.match(/"subject"\s*:\s*"([^"]+)"/)?.[1] || '';
+  }
+
+  // Markdown heading
   if (!title && markdown) {
     title = markdown.match(/^#\s+(.+)$/m)?.[1]?.trim() || '';
   }
 
-  // 7. Try window.runParams or data-title in HTML
-  if (!title) {
-    const dataTitle = html.match(/"subject"\s*:\s*"([^"]+)"/)?.[1] || '';
-    if (dataTitle) title = dataTitle;
-  }
-
-  // Clean
-  title = title.replace(/\s*[-|–]\s*(AliExpress|Aliexpress).*$/i, '').trim();
-  title = title.replace(/^\d+(\.\d+)?%?\s*OFF\s*/i, '').trim();
-  title = title.replace(/Comprar\s+/i, '').trim();
-  if (/captcha|recaptcha|verify|robot/i.test(title)) return '';
-
-  return title.substring(0, 200);
+  return title;
 }
 
-function extractDescription(html: string, metadata: Record<string, any>): string {
-  const desc = metadata?.description || metadata?.ogDescription ||
-    html.match(/<meta[^>]+(?:name|property)=["'](?:og:)?description["'][^>]*content=["']([^"']+)["']/i)?.[1]?.trim() || '';
-  return desc.substring(0, 800);
-}
+function extractImagesFromContent(content: string): string[] {
+  const images = new Set<string>();
 
-function extractPrices(html: string, markdown: string) {
-  const content = html + ' ' + markdown;
+  // og:image
+  const ogImg = content.match(/<meta[^>]+property=["']og:image["'][^>]*content=["']([^"']+)["']/i)?.[1];
+  if (ogImg && ogImg.includes('alicdn')) images.add(cleanImageUrl(ogImg));
 
   // JSON-LD
-  const jsonLdBlocks = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
-  if (jsonLdBlocks) {
-    for (const script of jsonLdBlocks) {
-      const c = script.replace(/<\/?script[^>]*>/gi, '');
+  const jsonLd = content.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
+  if (jsonLd) {
+    for (const script of jsonLd) {
       try {
-        const parsed = JSON.parse(c);
-        const offer = parsed.offers || parsed;
-        if (offer.price || offer.lowPrice) {
-          const price = String(offer.price || offer.lowPrice);
-          const highPrice = offer.highPrice ? `€${offer.highPrice}` : '';
-          return { price, originalPrice: highPrice };
+        const parsed = JSON.parse(script.replace(/<\/?script[^>]*>/gi, ''));
+        const imgs = parsed.image ? (Array.isArray(parsed.image) ? parsed.image : [parsed.image]) : [];
+        for (const img of imgs) {
+          const u = typeof img === 'string' ? img : img?.url;
+          if (u && u.includes('alicdn')) images.add(cleanImageUrl(u));
         }
-      } catch { /* ignore */ }
+      } catch { /* */ }
     }
   }
 
-  // Try runParams/window data (AliExpress JS data)
-  const priceMatch = html.match(/"formattedActivityPrice"\s*:\s*"[^"]*?([\d.]+)"/);
-  if (priceMatch) {
-    const origMatch = html.match(/"formattedPrice"\s*:\s*"[^"]*?([\d.]+)"/);
-    return {
-      price: priceMatch[1],
-      originalPrice: origMatch ? `€${origMatch[1]}` : '',
-    };
+  // imagePathList (AliExpress JS)
+  const listMatch = content.match(/"imagePathList"\s*:\s*\[([^\]]+)\]/);
+  if (listMatch) {
+    const urls = listMatch[1].match(/https?:\/\/[^"',\s]+/g);
+    if (urls) {
+      for (const u of urls) {
+        if (u.includes('alicdn')) images.add(cleanImageUrl(u));
+      }
+    }
   }
 
-  // Alt price patterns from AliExpress data
-  const minPrice = html.match(/"minPrice"\s*:\s*"?([\d.]+)"?/);
+  // All alicdn URLs
+  const pattern = /(?:https?:)?\/\/[a-z0-9.-]*alicdn\.com\/[^\s"'<>)]+/gi;
+  let m;
+  while ((m = pattern.exec(content)) !== null) {
+    let url = m[0].replace(/[,;}\]]+$/, '');
+    if (!url.startsWith('http')) url = 'https:' + url;
+    if (
+      (url.includes('/kf/') || url.includes('/imgextra/') || /\.(jpg|jpeg|png|webp)/i.test(url)) &&
+      !url.includes('icon') && !url.includes('logo') && !url.includes('flag') &&
+      !url.includes('avatar') && !url.includes('placeholder') &&
+      url.length > 30
+    ) {
+      images.add(cleanImageUrl(url));
+    }
+  }
+
+  // Markdown images
+  const mdImgs = content.matchAll(/!\[.*?\]\((https?:\/\/[^\s)]+alicdn[^\s)]+)\)/gi);
+  for (const match of mdImgs) {
+    images.add(cleanImageUrl(match[1]));
+  }
+
+  return [...images];
+}
+
+function extractPricesFromContent(content: string): { price: string; originalPrice: string } {
+  // JSON-LD
+  const jsonLd = content.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
+  if (jsonLd) {
+    for (const script of jsonLd) {
+      try {
+        const parsed = JSON.parse(script.replace(/<\/?script[^>]*>/gi, ''));
+        const offer = parsed.offers || parsed;
+        if (offer.price || offer.lowPrice) {
+          return {
+            price: String(offer.price || offer.lowPrice),
+            originalPrice: offer.highPrice ? `€${offer.highPrice}` : '',
+          };
+        }
+      } catch { /* */ }
+    }
+  }
+
+  // AliExpress JS data
+  const activityPrice = content.match(/"formattedActivityPrice"\s*:\s*"[^"]*?([\d.]+)"/);
+  if (activityPrice) {
+    const origMatch = content.match(/"formattedPrice"\s*:\s*"[^"]*?([\d.]+)"/);
+    return { price: activityPrice[1], originalPrice: origMatch ? `€${origMatch[1]}` : '' };
+  }
+  const minPrice = content.match(/"minPrice"\s*:\s*"?([\d.]+)"?/);
   if (minPrice) {
-    const maxPrice = html.match(/"maxPrice"\s*:\s*"?([\d.]+)"?/);
-    return {
-      price: minPrice[1],
-      originalPrice: maxPrice && maxPrice[1] !== minPrice[1] ? `€${maxPrice[1]}` : '',
-    };
+    const maxPrice = content.match(/"maxPrice"\s*:\s*"?([\d.]+)"?/);
+    return { price: minPrice[1], originalPrice: maxPrice && maxPrice[1] !== minPrice[1] ? `€${maxPrice[1]}` : '' };
   }
 
-  // Meta tag
-  const metaPrice = html.match(/product:price:amount["'][^>]*content=["']([^"']+)["']/i)?.[1];
-  if (metaPrice) return { price: metaPrice, originalPrice: '' };
-
-  // Regex fallback
+  // Regex
   const patterns = [/€\s*(\d+(?:[.,]\d{1,2})?)/g, /(\d+(?:[.,]\d{1,2})?)\s*€/g, /US\s*\$\s*(\d+(?:[.,]\d{1,2})?)/gi];
   const prices: number[] = [];
   for (const p of patterns) {
@@ -434,82 +532,11 @@ function extractPrices(html: string, markdown: string) {
   };
 }
 
-function extractImages(html: string, markdown: string, metadata: Record<string, any>): string[] {
-  const images = new Set<string>();
-  const content = html + ' ' + markdown;
-
-  // 1. Firecrawl metadata og:image
-  const ogFromMeta = metadata?.ogImage || metadata?.['og:image'];
-  if (ogFromMeta && typeof ogFromMeta === 'string' && ogFromMeta.includes('alicdn')) {
-    images.add(cleanImageUrl(ogFromMeta));
-  }
-
-  // 2. og:image from HTML
-  const ogImg = html.match(/<meta[^>]+property=["']og:image["'][^>]*content=["']([^"']+)["']/i)?.[1];
-  if (ogImg && ogImg.includes('alicdn')) images.add(cleanImageUrl(ogImg));
-  // Reversed attribute order
-  const ogImg2 = html.match(/<meta[^>]+content=["']([^"']+)["'][^>]*property=["']og:image["']/i)?.[1];
-  if (ogImg2 && ogImg2.includes('alicdn')) images.add(cleanImageUrl(ogImg2));
-
-  // 3. JSON-LD images
-  const jsonLdBlocks = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
-  if (jsonLdBlocks) {
-    for (const script of jsonLdBlocks) {
-      const c = script.replace(/<\/?script[^>]*>/gi, '');
-      try {
-        const parsed = JSON.parse(c);
-        const imgs = parsed.image ? (Array.isArray(parsed.image) ? parsed.image : [parsed.image]) : [];
-        for (const img of imgs) {
-          const u = typeof img === 'string' ? img : img?.url;
-          if (u && u.includes('alicdn')) images.add(cleanImageUrl(u));
-        }
-      } catch { /* ignore */ }
-    }
-  }
-
-  // 4. AliExpress JS data (imagePathList)
-  const imageListMatch = html.match(/"imagePathList"\s*:\s*\[([^\]]+)\]/);
-  if (imageListMatch) {
-    const urls = imageListMatch[1].match(/https?:\/\/[^"',\s]+/g);
-    if (urls) {
-      for (const u of urls) {
-        if (u.includes('alicdn')) images.add(cleanImageUrl(u));
-      }
-    }
-  }
-
-  // 5. All alicdn URLs in content
-  const pattern = /(?:https?:)?\/\/[a-z0-9.-]*alicdn\.com\/[^\s"'<>)]+/gi;
-  let m;
-  while ((m = pattern.exec(content)) !== null) {
-    let url = m[0].replace(/[,;}\]]+$/, '');
-    if (!url.startsWith('http')) url = 'https:' + url;
-    if (
-      (url.includes('/kf/') || url.includes('/imgextra/') || /\.(jpg|jpeg|png|webp)/i.test(url)) &&
-      !url.includes('icon') && !url.includes('logo') && !url.includes('flag') &&
-      !url.includes('avatar') && !url.includes('placeholder') &&
-      url.length > 30
-    ) {
-      images.add(cleanImageUrl(url));
-    }
-  }
-
-  // 6. Markdown image syntax
-  if (markdown) {
-    const mdImgs = markdown.matchAll(/!\[.*?\]\((https?:\/\/[^\s)]+alicdn[^\s)]+)\)/gi);
-    for (const match of mdImgs) {
-      images.add(cleanImageUrl(match[1]));
-    }
-  }
-
-  return [...images].slice(0, 20);
-}
-
 function cleanImageUrl(url: string): string {
   return url
     .replace(/_\d+x\d+\w*\./g, '.')
     .replace(/\.\d+x\d+\./g, '.')
-    .replace(/\?.*$/, ''); // Remove query params for cleaner URLs
+    .replace(/\?.*$/, '');
 }
 
 function generateSlug(title: string): string {
