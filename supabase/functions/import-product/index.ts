@@ -277,6 +277,9 @@ async function tryFirecrawlScrape(
     const metadata = data.data?.metadata || {};
 
     console.log('Firecrawl Scrape - HTML:', html.length, 'MD:', markdown.length);
+    console.log('Firecrawl metadata keys:', JSON.stringify(metadata));
+    console.log('Firecrawl HTML preview:', html.substring(0, 500));
+    console.log('Firecrawl MD preview:', markdown.substring(0, 500));
 
     const title = metadata?.title || metadata?.ogTitle || extractTitleFromContent(html, markdown);
     const images = extractImagesFromContent(html + ' ' + markdown);
