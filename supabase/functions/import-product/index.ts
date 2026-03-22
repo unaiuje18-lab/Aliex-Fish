@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
           'links',
           {
             type: 'json',
-            prompt: 'Extract from this AliExpress product page: 1) "title": product name, 2) "price": current price as number, 3) "price_min": lowest price if price range exists, 4) "price_max": highest price if price range exists, 5) "original_price": original/strikethrough price as number, 6) "currency": currency symbol (€/$), 7) "description": short description, 8) "images": array of ALL product gallery image URLs (full resolution), 9) "variants": array of {group, options: [{label, imageUrl?}]}. Return JSON.',
+            prompt: 'Extract from this AliExpress product page: 1) "title": product name, 2) "price": current/sale price as number, 3) "price_min": lowest price if a price range is shown, 4) "price_max": highest price if a price range is shown, 5) "original_price": original/strikethrough price as number if discounted, 6) "currency": currency symbol (€ or $), 7) "description": product description, 8) "images": array of ALL product gallery/carousel image URLs (full resolution, not thumbnails), 9) "variants": array of {group: string, options: [{label: string, imageUrl?: string}]}. Return as JSON.',
           },
         ],
         waitFor: 8000,
@@ -82,27 +82,54 @@ Deno.serve(async (req) => {
     let images: string[] = [];
     let price = '';
     let originalPrice = '';
+    let priceMin = '';
+    let priceMax = '';
+    let currency = '€';
     let description = '';
+    let variants: any[] = [];
 
     if (fcResponse.ok) {
       const json = fcData.data?.json || fcData.json;
       const markdown = fcData.data?.markdown || '';
       const metadata = fcData.data?.metadata || {};
+      const linksArr = fcData.data?.links || [];
 
-      console.log('Firecrawl JSON:', JSON.stringify(json)?.substring(0, 500));
-      console.log('Firecrawl metadata:', JSON.stringify(metadata)?.substring(0, 300));
-      console.log('Firecrawl markdown:', markdown?.substring(0, 300));
+      console.log('Firecrawl JSON:', JSON.stringify(json)?.substring(0, 800));
 
       // From AI JSON extraction
       if (json) {
         title = json.title || json.product_title || json.name || '';
-        price = String(json.price || json.current_price || '');
-        originalPrice = json.original_price ? `€${json.original_price}` : '';
+        currency = (json.currency === '$') ? '$' : '€';
         description = json.description || '';
+
+        // Parse prices - handle range vs fixed
+        const pMin = parseFloat(String(json.price_min || ''));
+        const pMax = parseFloat(String(json.price_max || ''));
+        const pSingle = parseFloat(String(json.price || json.current_price || ''));
+
+        if (pMin > 0 && pMax > 0 && pMin !== pMax) {
+          priceMin = pMin.toFixed(2);
+          priceMax = pMax.toFixed(2);
+          price = `${currency}${priceMin} - ${currency}${priceMax}`;
+        } else if (pSingle > 0) {
+          price = `${currency}${pSingle.toFixed(2)}`;
+        } else if (pMin > 0) {
+          price = `${currency}${pMin.toFixed(2)}`;
+        }
+
+        const pOrig = parseFloat(String(json.original_price || ''));
+        if (pOrig > 0) originalPrice = `${currency}${pOrig.toFixed(2)}`;
+
+        // Images from JSON
         const jsonImages = json.images || json.image_urls || json.product_images || [];
         if (Array.isArray(jsonImages)) {
-          images = jsonImages.filter((u: any) => typeof u === 'string' && u.includes('http'));
+          for (const u of jsonImages) {
+            if (typeof u === 'string' && u.includes('http')) images.push(u);
+          }
         }
+
+        // Variants from JSON
+        if (Array.isArray(json.variants)) variants = json.variants;
       }
 
       // From metadata
@@ -111,25 +138,47 @@ Deno.serve(async (req) => {
       const ogImg = metadata?.ogImage;
       if (ogImg && typeof ogImg === 'string') images.unshift(ogImg);
 
-      // From markdown/HTML - extract alicdn images
+      // Extract alicdn images from markdown/HTML (always, to supplement)
       const allContent = markdown + ' ' + (fcData.data?.html || '');
-      if (images.length < 2) {
-        const alicdnPattern = /(?:https?:)?\/\/[a-z0-9.-]*alicdn\.com\/[^\s"'<>)]+/gi;
-        let m;
-        while ((m = alicdnPattern.exec(allContent)) !== null) {
-          let imgUrl = m[0].replace(/[,;}\]]+$/, '');
-          if (!imgUrl.startsWith('http')) imgUrl = 'https:' + imgUrl;
-          if ((imgUrl.includes('/kf/') || imgUrl.includes('/imgextra/') || /\.(jpg|jpeg|png|webp)/i.test(imgUrl))
-            && !imgUrl.includes('icon') && !imgUrl.includes('logo') && imgUrl.length > 30) {
-            images.push(imgUrl.replace(/_\d+x\d+\w*\./g, '.').replace(/\?.*$/, ''));
+      const alicdnPattern = /(?:https?:)?\/\/[a-z0-9.-]*alicdn\.com\/[^\s"'<>)]+/gi;
+      let m;
+      while ((m = alicdnPattern.exec(allContent)) !== null) {
+        let imgUrl = m[0].replace(/[,;}\]]+$/, '');
+        if (!imgUrl.startsWith('http')) imgUrl = 'https:' + imgUrl;
+        if ((imgUrl.includes('/kf/') || imgUrl.includes('/imgextra/') || /\.(jpg|jpeg|png|webp)/i.test(imgUrl))
+          && !imgUrl.includes('icon') && !imgUrl.includes('logo') && imgUrl.length > 30) {
+          images.push(imgUrl);
+        }
+      }
+
+      // Extract from markdown image syntax
+      const mdImgs = allContent.matchAll(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/gi);
+      for (const match of mdImgs) {
+        if (match[1].includes('alicdn') || match[1].includes('aliexpress')) images.push(match[1]);
+      }
+
+      // Extract from links array
+      if (Array.isArray(linksArr)) {
+        for (const link of linksArr) {
+          if (typeof link === 'string' && /alicdn\.com.*\.(jpg|jpeg|png|webp)/i.test(link)
+            && (link.includes('/kf/') || link.includes('/imgextra/'))
+            && !link.includes('icon') && !link.includes('logo')) {
+            images.push(link);
           }
         }
       }
 
-      // Extract from markdown images
-      const mdImgs = allContent.matchAll(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/gi);
-      for (const match of mdImgs) {
-        if (match[1].includes('alicdn') || match[1].includes('aliexpress')) images.push(match[1]);
+      // Try price from markdown if not found via JSON
+      if (!price && markdown) {
+        const priceRangeMatch = markdown.match(/[€$]\s*(\d+[.,]\d{2})\s*[-–]\s*[€$]?\s*(\d+[.,]\d{2})/);
+        if (priceRangeMatch) {
+          priceMin = priceRangeMatch[1].replace(',', '.');
+          priceMax = priceRangeMatch[2].replace(',', '.');
+          price = `${currency}${priceMin} - ${currency}${priceMax}`;
+        } else {
+          const singlePriceMatch = markdown.match(/[€$]\s*(\d+[.,]\d{2})/);
+          if (singlePriceMatch) price = `${currency}${singlePriceMatch[1].replace(',', '.')}`;
+        }
       }
     } else {
       console.log('Firecrawl failed:', fcResponse.status, JSON.stringify(fcData)?.substring(0, 300));
@@ -139,10 +188,12 @@ Deno.serve(async (req) => {
     title = title.replace(/\s*[-|–]\s*(AliExpress|Aliexpress).*$/i, '').replace(/Comprar\s+/i, '').trim();
     if (/captcha|recaptcha|verify|robot|security/i.test(title)) title = '';
 
-    // Deduplicate images
-    images = [...new Set(images)].slice(0, 20);
+    // Deduplicate and clean images - remove thumbnail suffixes for full resolution
+    images = [...new Set(
+      images.map(u => u.replace(/_\d+x\d+\w*\./g, '.').replace(/\?.*$/, ''))
+    )].filter(u => u.length > 20).slice(0, 20);
 
-    // Strategy 2: If Firecrawl failed completely, try fetching Google cached version
+    // Strategy 2: If Firecrawl failed completely, try search fallback
     if (!title && images.length === 0) {
       console.log('Strategy 2: Google cache search');
       const searchResp = await fetch('https://api.firecrawl.dev/v1/search', {
@@ -158,8 +209,6 @@ Deno.serve(async (req) => {
       if (searchResp.ok) {
         const searchData = await searchResp.json();
         const results = searchData.data || [];
-        console.log('Search results:', results.length);
-        
         for (const r of results) {
           if (!title && r.title && r.url?.includes(productId)) {
             title = r.title.replace(/\s*[-|–]\s*(AliExpress|Aliexpress).*$/i, '').trim();
@@ -179,31 +228,32 @@ Deno.serve(async (req) => {
     const slug = title.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
       .replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').substring(0, 80) || `producto-${Date.now()}`;
 
-    const currentPrice = price.replace(/[^0-9.,]/g, '').replace(',', '.');
-    const origPrice = originalPrice.replace(/[^0-9.,]/g, '').replace(',', '.');
+    // Compute discount
     let discount = '';
-    if (currentPrice && origPrice && parseFloat(origPrice) > parseFloat(currentPrice)) {
-      discount = `-${Math.round(((parseFloat(origPrice) - parseFloat(currentPrice)) / parseFloat(origPrice)) * 100)}%`;
+    const basePrice = priceMin || price.replace(/[^0-9.,]/g, '').replace(',', '.');
+    const origPriceNum = originalPrice.replace(/[^0-9.,]/g, '').replace(',', '.');
+    if (basePrice && origPriceNum && parseFloat(origPriceNum) > parseFloat(basePrice)) {
+      discount = `-${Math.round(((parseFloat(origPriceNum) - parseFloat(basePrice)) / parseFloat(origPriceNum)) * 100)}%`;
     }
 
     const productData = {
       title: title.substring(0, 200),
       subtitle: description.substring(0, 100),
       description: description.substring(0, 800),
-      price: currentPrice ? `€${currentPrice}` : '€0.00',
-      originalPrice: origPrice ? `€${origPrice}` : '',
-      priceRange: '',
+      price: price || `${currency}0.00`,
+      originalPrice,
+      priceRange: (priceMin && priceMax) ? `${currency}${priceMin} - ${currency}${priceMax}` : '',
       discount,
       images,
       rating: 4.5, reviewCount: 0, ordersCount: 0,
       shippingCost: '', deliveryTime: '', sku: '',
-      variants: [] as any[],
+      variants,
       slug,
       affiliateLink: originalInputUrl,
       aliexpressUrl: productUrl,
     };
 
-    console.log(`SUCCESS: "${productData.title}", ${images.length} images`);
+    console.log(`SUCCESS: "${productData.title}", ${images.length} images, price: ${price}`);
     return new Response(JSON.stringify({ success: true, data: productData }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
