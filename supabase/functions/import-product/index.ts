@@ -127,72 +127,41 @@ Deno.serve(async (req) => {
       console.log('Search failed:', searchResp.status);
     }
 
-    // Strategy 2: Direct scrape as fallback (may timeout but worth trying)
-    if (images.length === 0) {
-      console.log('Strategy 2: Direct scrape (fast, markdown only)');
+    // Strategy 2: Search WITH scrape on 1 result (gets images/price from cached page)
+    if (images.length === 0 || !price) {
+      console.log('Strategy 2: Search with scrape for images/price');
       try {
-        const fcResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
+        const searchResp2 = await fetch('https://api.firecrawl.dev/v1/search', {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            url: productUrl,
-            formats: ['markdown', 'links'],
-            waitFor: 3000,
-            timeout: 15000,
+            query: `site:es.aliexpress.com item ${productId}`,
+            limit: 1,
+            lang: 'es',
+            scrapeOptions: { formats: ['markdown'] },
           }),
         });
-
-        if (fcResponse.ok) {
-          const fcData = await fcResponse.json();
-          const markdown = fcData.data?.markdown || '';
-          const metadata = fcData.data?.metadata || {};
-          const linksArr = fcData.data?.links || [];
-
-          if (!title) title = metadata?.title || metadata?.ogTitle || '';
-          if (!description) description = metadata?.description || '';
-
-          const ogImg = metadata?.ogImage;
-          if (ogImg && typeof ogImg === 'string') images.push(ogImg);
-
-          // alicdn images
-          const imgMatches = markdown.matchAll(/(?:https?:)?\/\/[a-z0-9.-]*(?:alicdn|ae01)\.com\/[^\s"'<>)\]]+/gi);
-          for (const im of imgMatches) {
-            let imgUrl = im[0].replace(/[,;}\]]+$/, '');
-            if (!imgUrl.startsWith('http')) imgUrl = 'https:' + imgUrl;
-            if (/\.(jpg|jpeg|png|webp)/i.test(imgUrl) && !imgUrl.includes('icon') && !imgUrl.includes('logo')) {
-              images.push(imgUrl);
+        if (searchResp2.ok) {
+          const sd2 = await searchResp2.json();
+          for (const r of (sd2.data || [])) {
+            const md = r.markdown || '';
+            console.log('Scrape result markdown length:', md.length);
+            // Images
+            const imgM = md.matchAll(/(?:https?:)?\/\/[a-z0-9.-]*(?:alicdn|ae01|ae04)\.com\/[^\s"'<>)\],\\]+/gi);
+            for (const im of imgM) {
+              let u = im[0].replace(/[,;}\]\\]+$/, '');
+              if (!u.startsWith('http')) u = 'https:' + u;
+              if (/\.(jpg|jpeg|png|webp)/i.test(u) && !u.includes('icon') && !u.includes('logo') && !u.includes('avatar') && u.length > 30) images.push(u);
+            }
+            // Price
+            if (!price) {
+              const rm = md.match(/[€$]\s*(\d+[.,]\d{1,2})\s*[-–—]\s*[€$]?\s*(\d+[.,]\d{1,2})/);
+              if (rm) { priceMin = rm[1].replace(',','.'); priceMax = rm[2].replace(',','.'); price = `${currency}${priceMin} - ${currency}${priceMax}`; }
+              else { const sm = md.match(/[€$]\s*(\d+[.,]\d{1,2})/); if (sm) price = `${currency}${sm[1].replace(',','.')}`; }
             }
           }
-
-          // From links
-          if (Array.isArray(linksArr)) {
-            for (const link of linksArr) {
-              const l = typeof link === 'string' ? link : '';
-              if (l && /(?:alicdn|ae01)\.com.*\.(jpg|jpeg|png|webp)/i.test(l) && !l.includes('icon')) {
-                images.push(l);
-              }
-            }
-          }
-
-          // Price from markdown
-          if (!price) {
-            const rangeMatch = markdown.match(/[€$]\s*(\d+[.,]\d{1,2})\s*[-–—]\s*[€$]?\s*(\d+[.,]\d{1,2})/);
-            if (rangeMatch) {
-              priceMin = rangeMatch[1].replace(',', '.');
-              priceMax = rangeMatch[2].replace(',', '.');
-              price = `${currency}${priceMin} - ${currency}${priceMax}`;
-            } else {
-              const singleMatch = markdown.match(/[€$]\s*(\d+[.,]\d{1,2})/);
-              if (singleMatch) price = `${currency}${singleMatch[1].replace(',', '.')}`;
-            }
-          }
-        } else {
-          const errData = await fcResponse.text();
-          console.log('Direct scrape failed:', fcResponse.status, errData.substring(0, 200));
         }
-      } catch (e) {
-        console.log('Direct scrape error:', e);
-      }
+      } catch (e) { console.log('Strategy 2 error:', e); }
     }
 
     // Clean title
