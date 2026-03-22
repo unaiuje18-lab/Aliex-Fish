@@ -81,62 +81,45 @@ Deno.serve(async (req) => {
       console.log('Search results:', results.length);
 
       for (const r of results) {
-        console.log('Result:', r.title?.substring(0, 80), r.url?.substring(0, 80));
+        const rContent = JSON.stringify(r);
+        console.log('Result:', r.title?.substring(0, 80), '|', r.url?.substring(0, 80));
 
-        if (!title && r.title) {
-          title = r.title;
+        if (!title && r.title) title = r.title;
+        if (!description && r.description) description = r.description;
+
+        // Parse prices from title + description + any available content
+        const textToParse = `${r.title || ''} ${r.description || ''} ${r.markdown || ''}`;
+        if (!price) {
+          // Range: €1.23 - €4.56 or $1.23-$4.56
+          const rangeMatch = textToParse.match(/[€$]\s*(\d+[.,]\d{1,2})\s*[-–—]\s*[€$]?\s*(\d+[.,]\d{1,2})/);
+          if (rangeMatch) {
+            currency = textToParse.match(/[€$]/)?.[0] || '€';
+            priceMin = rangeMatch[1].replace(',', '.');
+            priceMax = rangeMatch[2].replace(',', '.');
+            price = `${currency}${priceMin} - ${currency}${priceMax}`;
+          } else {
+            // US$ pattern: US $1.23 or US$ 1.23
+            const usMatch = textToParse.match(/US\s*\$\s*(\d+[.,]\d{1,2})/i);
+            const euroMatch = textToParse.match(/[€]\s*(\d+[.,]\d{1,2})/);
+            const dollarMatch = textToParse.match(/\$\s*(\d+[.,]\d{1,2})/);
+            const m = euroMatch || usMatch || dollarMatch;
+            if (m) {
+              currency = euroMatch ? '€' : '$';
+              price = `${currency}${m[1].replace(',', '.')}`;
+            }
+          }
         }
-        if (!description && r.description) {
-          description = r.description;
-        }
 
-        // Extract from result markdown if available
-        const rMd = r.markdown || '';
-        if (rMd) {
-          // Price extraction from markdown
-          if (!price) {
-            const rangeMatch = rMd.match(/[€$]\s*(\d+[.,]\d{1,2})\s*[-–—]\s*[€$]?\s*(\d+[.,]\d{1,2})/);
-            if (rangeMatch) {
-              currency = rMd.match(/[€$]/)?.[0] || '€';
-              priceMin = rangeMatch[1].replace(',', '.');
-              priceMax = rangeMatch[2].replace(',', '.');
-              price = `${currency}${priceMin} - ${currency}${priceMax}`;
-            } else {
-              const singleMatch = rMd.match(/[€$]\s*(\d+[.,]\d{1,2})/);
-              if (singleMatch) {
-                currency = rMd.match(/[€$]/)?.[0] || '€';
-                price = `${currency}${singleMatch[1].replace(',', '.')}`;
-              }
-            }
-          }
-
-          // Original price
-          if (!originalPrice) {
-            const origMatch = rMd.match(/~~[€$]?\s*(\d+[.,]\d{1,2})~~/)
-              || rMd.match(/(?:original|antes|was|precio original)[:\s]*[€$]\s*(\d+[.,]\d{1,2})/i);
-            if (origMatch) {
-              originalPrice = `${currency}${origMatch[1].replace(',', '.')}`;
-            }
-          }
-
-          // Images from markdown
-          const imgMatches = rMd.matchAll(/(?:https?:)?\/\/[a-z0-9.-]*(?:alicdn|ae01)\.com\/[^\s"'<>)\]]+/gi);
-          for (const im of imgMatches) {
-            let imgUrl = im[0].replace(/[,;}\]]+$/, '');
-            if (!imgUrl.startsWith('http')) imgUrl = 'https:' + imgUrl;
-            if (/\.(jpg|jpeg|png|webp)/i.test(imgUrl)
-              && !imgUrl.includes('icon') && !imgUrl.includes('logo')
-              && !imgUrl.includes('avatar') && imgUrl.length > 30) {
-              images.push(imgUrl);
-            }
-          }
-
-          // Markdown image syntax
-          const mdImgs = rMd.matchAll(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/gi);
-          for (const match of mdImgs) {
-            if (match[1].includes('alicdn') || match[1].includes('ae0')) {
-              images.push(match[1]);
-            }
+        // Images from any URL in the result
+        const imgMatches = rContent.matchAll(/(?:https?:)?\/\/[a-z0-9.-]*(?:alicdn|ae01|ae04)\.com\/[^\s"'<>)\],\\]+/gi);
+        for (const im of imgMatches) {
+          let imgUrl = im[0].replace(/[,;}\]\\]+$/, '');
+          if (!imgUrl.startsWith('http')) imgUrl = 'https:' + imgUrl;
+          if (/\.(jpg|jpeg|png|webp)/i.test(imgUrl)
+            && !imgUrl.includes('icon') && !imgUrl.includes('logo')
+            && !imgUrl.includes('avatar') && !imgUrl.includes('_50x50')
+            && imgUrl.length > 30) {
+            images.push(imgUrl);
           }
         }
       }
