@@ -69,10 +69,9 @@ Deno.serve(async (req) => {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        query: `site:aliexpress.com ${productId}`,
-        limit: 3,
+        query: `aliexpress.com item ${productId}`,
+        limit: 5,
         lang: 'es',
-        scrapeOptions: { formats: ['markdown'] },
       }),
     });
 
