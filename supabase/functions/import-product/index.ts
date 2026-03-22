@@ -85,7 +85,7 @@ Deno.serve(async (req) => {
     let variants: any[] = [];
 
     if (fcResponse.ok) {
-      const json = fcData.data?.json || fcData.json;
+      const json = fcData.data?.extract || fcData.data?.json || fcData.extract || fcData.json;
       const markdown = fcData.data?.markdown || '';
       const metadata = fcData.data?.metadata || {};
       const linksArr = fcData.data?.links || [];
