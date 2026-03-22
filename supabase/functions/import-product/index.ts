@@ -61,14 +61,10 @@ Deno.serve(async (req) => {
       headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         url: productUrl,
-        formats: [
-          'markdown',
-          'links',
-          {
-            type: 'json',
-            prompt: 'Extract from this AliExpress product page: 1) "title": product name, 2) "price": current/sale price as number, 3) "price_min": lowest price if a price range is shown, 4) "price_max": highest price if a price range is shown, 5) "original_price": original/strikethrough price as number if discounted, 6) "currency": currency symbol (€ or $), 7) "description": product description, 8) "images": array of ALL product gallery/carousel image URLs (full resolution, not thumbnails), 9) "variants": array of {group: string, options: [{label: string, imageUrl?: string}]}. Return as JSON.',
-          },
-        ],
+        formats: ['markdown', 'links', 'extract'],
+        extract: {
+          prompt: 'Extract from this AliExpress product page: "title" (product name), "price" (current/sale price as number), "price_min" (lowest price if range), "price_max" (highest price if range), "original_price" (strikethrough price as number), "currency" (€ or $), "description" (product description), "images" (array of ALL product gallery image URLs, full resolution), "variants" (array of {group, options: [{label, imageUrl?}]}).',
+        },
         waitFor: 8000,
         timeout: 45000,
         onlyMainContent: false,
