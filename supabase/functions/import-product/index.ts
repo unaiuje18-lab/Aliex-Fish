@@ -52,32 +52,6 @@ Deno.serve(async (req) => {
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Strategy 1: Firecrawl scrape with JSON extraction (AI-powered)
-    const productUrl = `https://www.aliexpress.com/item/${productId}.html`;
-    console.log('Trying Firecrawl JSON extraction on:', productUrl);
-    
-    const fcResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        url: productUrl,
-        formats: [
-          'markdown',
-          'links',
-          {
-            type: 'json',
-            prompt: 'Extract from this AliExpress product page: 1) "title": product name, 2) "price": current/sale price as number, 3) "price_min": lowest price if a price range is shown, 4) "price_max": highest price if a price range is shown, 5) "original_price": original/strikethrough price as number if discounted, 6) "currency": currency symbol (€ or $), 7) "description": product description, 8) "images": array of ALL product gallery/carousel image URLs (full resolution, not thumbnails), 9) "variants": array of {group: string, options: [{label: string, imageUrl?: string}]}. Return as JSON.',
-          },
-        ],
-        waitFor: 8000,
-        timeout: 45000,
-        onlyMainContent: false,
-      }),
-    });
-
-    const fcData = await fcResponse.json();
-    console.log('Firecrawl status:', fcResponse.status);
-    
     let title = '';
     let images: string[] = [];
     let price = '';
@@ -86,154 +60,175 @@ Deno.serve(async (req) => {
     let priceMax = '';
     let currency = '€';
     let description = '';
-    let variants: any[] = [];
 
-    if (fcResponse.ok) {
-      const json = fcData.data?.json || fcData.json;
-      const markdown = fcData.data?.markdown || '';
-      const metadata = fcData.data?.metadata || {};
-      const linksArr = fcData.data?.links || [];
+    const productUrl = `https://www.aliexpress.com/item/${productId}.html`;
 
-      console.log('Firecrawl JSON:', JSON.stringify(json)?.substring(0, 800));
+    // Strategy 1: Fast search (no scrapeOptions = instant results)
+    console.log('Searching for product', productId);
+    const searchResp = await fetch('https://api.firecrawl.dev/v1/search', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: `aliexpress.com item ${productId}`,
+        limit: 5,
+        lang: 'es',
+      }),
+    });
 
-      // From AI JSON extraction
-      if (json) {
-        title = json.title || json.product_title || json.name || '';
-        currency = (json.currency === '$') ? '$' : '€';
-        description = json.description || '';
+    if (searchResp.ok) {
+      const searchData = await searchResp.json();
+      const results = searchData.data || [];
+      console.log('Search results:', results.length);
 
-        // Parse prices - handle range vs fixed
-        const pMin = parseFloat(String(json.price_min || ''));
-        const pMax = parseFloat(String(json.price_max || ''));
-        const pSingle = parseFloat(String(json.price || json.current_price || ''));
+      for (const r of results) {
+        console.log('Result:', r.title?.substring(0, 60), '|', r.description?.substring(0, 80));
+        if (!title && r.title) title = r.title;
+        if (!description && r.description) description = r.description;
 
-        if (pMin > 0 && pMax > 0 && pMin !== pMax) {
-          priceMin = pMin.toFixed(2);
-          priceMax = pMax.toFixed(2);
-          price = `${currency}${priceMin} - ${currency}${priceMax}`;
-        } else if (pSingle > 0) {
-          price = `${currency}${pSingle.toFixed(2)}`;
-        } else if (pMin > 0) {
-          price = `${currency}${pMin.toFixed(2)}`;
-        }
-
-        const pOrig = parseFloat(String(json.original_price || ''));
-        if (pOrig > 0) originalPrice = `${currency}${pOrig.toFixed(2)}`;
-
-        // Images from JSON
-        const jsonImages = json.images || json.image_urls || json.product_images || [];
-        if (Array.isArray(jsonImages)) {
-          for (const u of jsonImages) {
-            if (typeof u === 'string' && u.includes('http')) images.push(u);
+        // Try to extract price from description/title
+        const text = `${r.title || ''} ${r.description || ''}`;
+        if (!price) {
+          const rangeMatch = text.match(/[€$]\s*(\d+[.,]\d{1,2})\s*[-–—]\s*[€$]?\s*(\d+[.,]\d{1,2})/);
+          if (rangeMatch) {
+            currency = text.match(/[€$]/)?.[0] || '€';
+            priceMin = rangeMatch[1].replace(',', '.');
+            priceMax = rangeMatch[2].replace(',', '.');
+            price = `${currency}${priceMin} - ${currency}${priceMax}`;
+          } else {
+            const usMatch = text.match(/US\s*\$\s*(\d+[.,]\d{1,2})/i);
+            const euroMatch = text.match(/€\s*(\d+[.,]\d{1,2})/);
+            const m = euroMatch || usMatch;
+            if (m) { currency = euroMatch ? '€' : '$'; price = `${currency}${m[1].replace(',', '.')}`; }
           }
         }
 
-        // Variants from JSON
-        if (Array.isArray(json.variants)) variants = json.variants;
-      }
-
-      // From metadata
-      if (!title) title = metadata?.title || metadata?.ogTitle || '';
-      if (!description) description = metadata?.description || '';
-      const ogImg = metadata?.ogImage;
-      if (ogImg && typeof ogImg === 'string') images.unshift(ogImg);
-
-      // Extract alicdn images from markdown/HTML (always, to supplement)
-      const allContent = markdown + ' ' + (fcData.data?.html || '');
-      const alicdnPattern = /(?:https?:)?\/\/[a-z0-9.-]*alicdn\.com\/[^\s"'<>)]+/gi;
-      let m;
-      while ((m = alicdnPattern.exec(allContent)) !== null) {
-        let imgUrl = m[0].replace(/[,;}\]]+$/, '');
-        if (!imgUrl.startsWith('http')) imgUrl = 'https:' + imgUrl;
-        if ((imgUrl.includes('/kf/') || imgUrl.includes('/imgextra/') || /\.(jpg|jpeg|png|webp)/i.test(imgUrl))
-          && !imgUrl.includes('icon') && !imgUrl.includes('logo') && imgUrl.length > 30) {
-          images.push(imgUrl);
+        // Extract any alicdn image URLs from all fields
+        const rStr = JSON.stringify(r);
+        const imgM = rStr.matchAll(/https?:\/\/[a-z0-9.-]*(?:alicdn|ae01|ae04)\.com\/[^\s"'\\,]+?\.(jpg|jpeg|png|webp)/gi);
+        for (const im of imgM) {
+          const u = im[0];
+          if (!u.includes('icon') && !u.includes('logo') && !u.includes('avatar') && !u.includes('_50x') && u.length > 30) images.push(u);
         }
       }
+    }
 
-      // Extract from markdown image syntax
-      const mdImgs = allContent.matchAll(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/gi);
-      for (const match of mdImgs) {
-        if (match[1].includes('alicdn') || match[1].includes('aliexpress')) images.push(match[1]);
-      }
+    // Strategy 2: Try direct fetch of OG meta (no JS rendering needed, very fast)
+    if (images.length === 0 || !price) {
+      console.log('Strategy 2: Direct HTTP fetch for OG meta');
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 8000);
+        const directResp = await fetch(`https://es.aliexpress.com/item/${productId}.html`, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+            'Accept': 'text/html',
+            'Accept-Language': 'es-ES,es;q=0.9',
+          },
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
 
-      // Extract from links array
-      if (Array.isArray(linksArr)) {
-        for (const link of linksArr) {
-          if (typeof link === 'string' && /alicdn\.com.*\.(jpg|jpeg|png|webp)/i.test(link)
-            && (link.includes('/kf/') || link.includes('/imgextra/'))
-            && !link.includes('icon') && !link.includes('logo')) {
-            images.push(link);
+        if (directResp.ok) {
+          const html = await directResp.text();
+          console.log('Direct fetch HTML length:', html.length);
+
+          // OG image
+          const ogImgMatch = html.match(/<meta\s+property="og:image"\s+content="([^"]+)"/i)
+            || html.match(/<meta\s+content="([^"]+)"\s+property="og:image"/i);
+          if (ogImgMatch) images.unshift(ogImgMatch[1]);
+
+          // OG title
+          if (!title) {
+            const ogTitle = html.match(/<meta\s+property="og:title"\s+content="([^"]+)"/i);
+            if (ogTitle) title = ogTitle[1];
+          }
+
+          // OG description
+          if (!description) {
+            const ogDesc = html.match(/<meta\s+property="og:description"\s+content="([^"]+)"/i);
+            if (ogDesc) description = ogDesc[1];
+          }
+
+          // Extract images from page data/JSON
+          const imgPattern = /https?:\/\/[a-z0-9.-]*(?:alicdn|ae01|ae04)\.com\/[^\s"'<>]+?\.(jpg|jpeg|png|webp)/gi;
+          let im;
+          while ((im = imgPattern.exec(html)) !== null) {
+            const u = im[0];
+            if ((u.includes('/kf/') || u.includes('/imgextra/'))
+              && !u.includes('icon') && !u.includes('logo') && !u.includes('avatar')
+              && !u.includes('_50x') && u.length > 30) {
+              images.push(u);
+            }
+          }
+
+          // Extract price from HTML data
+          if (!price) {
+            // JSON data in page often has prices
+            const priceMatch = html.match(/"formattedActivityPrice":"([^"]+)"/);
+            const minMatch = html.match(/"minActivityAmount":\{"value":(\d+\.?\d*)/);
+            const maxMatch = html.match(/"maxActivityAmount":\{"value":(\d+\.?\d*)/);
+            const minPrice2 = html.match(/"minAmount":\{"value":(\d+\.?\d*)/);
+            const maxPrice2 = html.match(/"maxAmount":\{"value":(\d+\.?\d*)/);
+
+            const pMin = parseFloat(minMatch?.[1] || minPrice2?.[1] || '0');
+            const pMax = parseFloat(maxMatch?.[1] || maxPrice2?.[1] || '0');
+
+            if (pMin > 0 && pMax > 0 && pMin !== pMax) {
+              priceMin = pMin.toFixed(2);
+              priceMax = pMax.toFixed(2);
+              price = `${currency}${priceMin} - ${currency}${priceMax}`;
+            } else if (priceMatch) {
+              price = priceMatch[1];
+            } else if (pMin > 0) {
+              price = `${currency}${pMin.toFixed(2)}`;
+            }
+
+            // Original price
+            const origMatch = html.match(/"formattedPrice":"([^"]+)"/)
+              || html.match(/"originalPrice":\{"value":(\d+\.?\d*)/);
+            if (origMatch && !originalPrice) {
+              const v = origMatch[1].replace(/[^0-9.,]/g, '').replace(',', '.');
+              if (v && parseFloat(v) > 0) originalPrice = `${currency}${v}`;
+            }
           }
         }
+      } catch (e) {
+        console.log('Direct fetch error:', e);
       }
-
-      // Try price from markdown if not found via JSON
-      if (!price && markdown) {
-        const priceRangeMatch = markdown.match(/[€$]\s*(\d+[.,]\d{2})\s*[-–]\s*[€$]?\s*(\d+[.,]\d{2})/);
-        if (priceRangeMatch) {
-          priceMin = priceRangeMatch[1].replace(',', '.');
-          priceMax = priceRangeMatch[2].replace(',', '.');
-          price = `${currency}${priceMin} - ${currency}${priceMax}`;
-        } else {
-          const singlePriceMatch = markdown.match(/[€$]\s*(\d+[.,]\d{2})/);
-          if (singlePriceMatch) price = `${currency}${singlePriceMatch[1].replace(',', '.')}`;
-        }
-      }
-    } else {
-      console.log('Firecrawl failed:', fcResponse.status, JSON.stringify(fcData)?.substring(0, 300));
     }
 
     // Clean title
-    title = title.replace(/\s*[-|–]\s*(AliExpress|Aliexpress).*$/i, '').replace(/Comprar\s+/i, '').trim();
+    title = title
+      .replace(/\s*[-|–]\s*(AliExpress|Aliexpress).*$/i, '')
+      .replace(/Comprar\s+/i, '')
+      .replace(/^\d+\.\d+US\s*\$\s*/i, '')
+      .trim();
     if (/captcha|recaptcha|verify|robot|security/i.test(title)) title = '';
 
-    // Deduplicate and clean images - remove thumbnail suffixes for full resolution
+    // Deduplicate and clean images
     images = [...new Set(
-      images.map(u => u.replace(/_\d+x\d+\w*\./g, '.').replace(/\?.*$/, ''))
-    )].filter(u => u.length > 20).slice(0, 20);
-
-    // Strategy 2: If Firecrawl failed completely, try search fallback
-    if (!title && images.length === 0) {
-      console.log('Strategy 2: Google cache search');
-      const searchResp = await fetch('https://api.firecrawl.dev/v1/search', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query: `aliexpress item ${productId}`,
-          limit: 5,
-          lang: 'es',
-        }),
-      });
-      
-      if (searchResp.ok) {
-        const searchData = await searchResp.json();
-        const results = searchData.data || [];
-        for (const r of results) {
-          if (!title && r.title && r.url?.includes(productId)) {
-            title = r.title.replace(/\s*[-|–]\s*(AliExpress|Aliexpress).*$/i, '').trim();
-          }
-          if (!description && r.description) description = r.description;
-        }
-      }
-    }
+      images.map(u => {
+        let clean = u.replace(/_\d+x\d+\w*\./g, '.').replace(/\?.*$/, '');
+        if (!clean.startsWith('http')) clean = 'https:' + clean;
+        return clean;
+      })
+    )].filter(u => u.length > 30 && /\.(jpg|jpeg|png|webp)$/i.test(u)).slice(0, 20);
 
     if (!title && images.length === 0) {
       return new Response(JSON.stringify({
         success: false,
-        error: 'No se pudo extraer datos de AliExpress. Prueba con otro link o añade el producto manualmente.',
+        error: 'No se pudo extraer datos. Prueba con otro link.',
       }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     const slug = title.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
       .replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').substring(0, 80) || `producto-${Date.now()}`;
 
-    // Compute discount
     let discount = '';
-    const basePrice = priceMin || price.replace(/[^0-9.,]/g, '').replace(',', '.');
-    const origPriceNum = originalPrice.replace(/[^0-9.,]/g, '').replace(',', '.');
-    if (basePrice && origPriceNum && parseFloat(origPriceNum) > parseFloat(basePrice)) {
-      discount = `-${Math.round(((parseFloat(origPriceNum) - parseFloat(basePrice)) / parseFloat(origPriceNum)) * 100)}%`;
+    const basePriceStr = priceMin || price.replace(/[^0-9.,]/g, '').replace(',', '.');
+    const origPriceStr = originalPrice.replace(/[^0-9.,]/g, '').replace(',', '.');
+    if (basePriceStr && origPriceStr && parseFloat(origPriceStr) > parseFloat(basePriceStr)) {
+      discount = `-${Math.round(((parseFloat(origPriceStr) - parseFloat(basePriceStr)) / parseFloat(origPriceStr)) * 100)}%`;
     }
 
     const productData = {
@@ -247,13 +242,13 @@ Deno.serve(async (req) => {
       images,
       rating: 4.5, reviewCount: 0, ordersCount: 0,
       shippingCost: '', deliveryTime: '', sku: '',
-      variants,
+      variants: [] as any[],
       slug,
       affiliateLink: originalInputUrl,
       aliexpressUrl: productUrl,
     };
 
-    console.log(`SUCCESS: "${productData.title}", ${images.length} images, price: ${price}`);
+    console.log(`SUCCESS: "${productData.title}", ${images.length} imgs, price: ${price}`);
     return new Response(JSON.stringify({ success: true, data: productData }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
@@ -264,7 +259,6 @@ Deno.serve(async (req) => {
   }
 });
 
-// ===== URL resolution =====
 async function resolveAliExpressUrl(url: string) {
   let formattedUrl = url.trim();
   if (!formattedUrl.startsWith('http')) formattedUrl = `https://${formattedUrl}`;
@@ -282,16 +276,13 @@ async function resolveAliExpressUrl(url: string) {
         headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
         signal: controller.signal });
       clearTimeout(timeout);
-
       productId = extractProductId(res.url);
       if (productId) return { productId, originalInputUrl };
-
       const body = await res.text();
       productId = extractProductId(body);
       if (productId) return { productId, originalInputUrl };
     } catch (e) { console.log('Short link failed:', e); }
   }
-
   return { productId: null, originalInputUrl };
 }
 
